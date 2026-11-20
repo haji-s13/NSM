@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Norwegian Singles Planner</title>
+  <meta name="description" content="Predicted training paces and a 12-week sub-threshold workout builder for the Norwegian Singles method." />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap">
+      <h1>Norwegian Singles Planner</h1>
+      <p class="tagline">Sub-threshold paces and 12-week plans from your 5k or 10k PB</p>
+    </div>
+  </header>
+
+  <nav class="tabs wrap" role="tablist">
+    <button class="tab" role="tab" id="tab-paces" aria-controls="panel-paces" aria-selected="true">Predicted Paces</button>
+    <button class="tab" role="tab" id="tab-builder" aria-controls="panel-builder" aria-selected="false">12-Week Builder</button>
+  </nav>
+
+  <main class="wrap">
+    <!-- ================= PACES ================= -->
+    <section id="panel-paces" role="tabpanel" aria-labelledby="tab-paces">
+      <div class="card">
+        <h2>Your PB</h2>
+        <div class="form-grid">
+          <label>Distance
+            <select id="pb-distance">
+              <option value="5000">5k</option>
+              <option value="10000">10k</option>
+            </select>
+          </label>
+          <label>Time <span class="hint">mm:ss or h:mm:ss</span>
+            <input id="pb-time" type="text" inputmode="numeric" placeholder="19:45" value="19:45" autocomplete="off" />
+          </label>
+          <label>Units
+            <select id="units">
+              <option value="km">Kilometres</option>
+              <option value="mi">Miles</option>
+            </select>
+          </label>
+          <label>Sub-T pace adjustment <span class="hint">sec/km (+ = slower)</span>
+            <input id="pace-adjust" type="number" step="1" min="-15" max="30" value="0" />
+          </label>
+        </div>
+        <p id="pb-error" class="error" hidden></p>
+      </div>
+
+      <div class="card">
+        <h2>Predicted race times</h2>
+        <div class="table-scroll">
+          <table class="data">
+            <thead><tr><th>Distance</th><th>Time</th><th>Pace</th></tr></thead>
+            <tbody id="race-table"></tbody>
+          </table>
+        </div>
+        <p class="note">Predicted with Riegel's formula (exponent 1.06). The predictions are less accurate the further a distance is from your PB distance.</p>
+      </div>
+
+      <div class="card">
+        <h2>Training paces</h2>
+        <div class="table-scroll">
+          <table class="data">
+            <thead><tr><th>Session</th><th>Based on</th><th>Pace</th><th>Rep targets</th></tr></thead>
+            <tbody id="pace-table"></tbody>
+          </table>
+        </div>
+        <p class="note">Sub-threshold reps should feel controlled, and you should finish every session feeling you could have done another rep. If the effort climbs, slow down. Heart rate and lactate matter more than the pace on your watch.</p>
+      </div>
+    </section>
+
+    <!-- ================= BUILDER ================= -->
+    <section id="panel-builder" role="tabpanel" aria-labelledby="tab-builder" hidden>
+      <div class="card">
+        <h2>Plan settings</h2>
+        <p class="pb-summary" id="pb-summary"></p>
+        <div class="form-grid">
+          <label>Start date (week 1 Monday)
+            <input id="start-date" type="date" />
+          </label>
+          <label>Peak weekly volume <span class="hint" id="vol-unit">km</span>
+            <input id="peak-volume" type="number" min="15" max="250" step="1" value="75" />
+          </label>
+          <label>Rep format
+            <select id="rep-format">
+              <option value="distance">Distance (1k / 2k / 3k)</option>
+              <option value="time">Time (3 / 6 / 10 min)</option>
+              <option value="mixed">Alternate each week</option>
+            </select>
+          </label>
+          <label>Week 12
+            <select id="final-week">
+              <option value="race">Taper + race</option>
+              <option value="test">Time trial</option>
+              <option value="normal">Normal week</option>
+            </select>
+          </label>
+          <label class="check"><input id="deloads" type="checkbox" checked /> Lighter week every 4th week</label>
+        </div>
+
+        <h3>Weekly template</h3>
+        <div class="week-template" id="week-template"></div>
+        <p class="note">Classic layout: 2–3 sub-threshold days with an easy day between each, plus one long easy run. Most of your weekly volume should be easy running.</p>
+      </div>
+
+      <div class="toolbar">
+        <button id="btn-print" class="btn">Print</button>
+        <button id="btn-csv" class="btn">Download CSV</button>
+        <button id="btn-reset" class="btn btn-ghost">Reset to defaults</button>
+      </div>
+
+      <div id="plan-warnings"></div>
+      <div id="plan"></div>
+    </section>
+  </main>
+
+  <footer class="wrap site-footer">
+    <p>Your settings are saved in this browser only.</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
