@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Norwegian Singles Planner</title>
   <meta name="description" content="Predicted training paces and a 12-week sub-threshold workout builder for the Norwegian Singles method." />
-  <link rel="stylesheet" href="styles.css?v=12" />
+  <link rel="stylesheet" href="styles.css?v=13" />
 </head>
 <body>
   <header class="site-header">
@@ -146,7 +146,7 @@
         <button id="btn-print" class="btn">Print</button>
         <button id="btn-csv" class="btn">Download CSV</button>
         <button id="btn-push-all" class="btn">Send all to intervals.icu</button>
-        <button id="btn-coros-all" class="btn coros-only" hidden>Send all to COROS</button>
+        <button id="btn-coros-all" class="btn" hidden>Send all to COROS</button>
         <button id="btn-reset" class="btn btn-ghost">Reset to defaults</button>
         <span id="push-msg" class="push-msg" role="status"></span>
       </div>
@@ -165,6 +165,21 @@
           <li>COROS accepts workouts from today up to 90 days ahead. Days outside that window are skipped.</li>
           <li>Sent days show <strong>COROS ✓</strong> on this device. Sending one again adds a second copy, so delete the old one in the COROS app first.</li>
         </ul>
+        <div class="coros-direct" hidden>
+          <p class="lead">Connect your COROS account to send workouts from the 12-Week Builder straight to your COROS training schedule.</p>
+          <div class="toolbar icu-actions">
+            <button id="btn-coros-connect" class="btn">Connect COROS</button>
+            <button id="btn-coros-disconnect" class="btn btn-ghost" hidden>Disconnect</button>
+            <span id="coros-msg" class="push-msg" role="status"></span>
+          </div>
+          <ul class="steps">
+            <li>Connect COROS takes you to the COROS sign-in page, then back here.</li>
+            <li>Then use <strong>COROS</strong> on a day, <strong>COROS week</strong>, or <strong>Send all to COROS</strong> on the 12-Week Builder.</li>
+            <li>COROS accepts workouts from today up to 90 days ahead. Days outside that window are skipped.</li>
+            <li>Sent days show <strong>COROS ✓</strong> on this device. Sending one again adds a second copy, so delete the old one in the COROS app first.</li>
+          </ul>
+          <p class="note">Your COROS sign-in is kept only in this browser. Disconnect removes it from this device.</p>
+        </div>
         <p class="coros-absent lead">Sending straight to COROS works only when the planner is open on claude.ai with your Claude NSM connector connected. Otherwise, use intervals.icu below, which syncs to COROS.</p>
       </div>
 
@@ -203,6 +218,6 @@
     <p>Your settings are saved in this browser only.</p>
   </footer>
 
-  <script src="app.js?v=12"></script>
+  <script src="app.js?v=13"></script>
 </body>
 </html>

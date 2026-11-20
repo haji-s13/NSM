@@ -778,9 +778,15 @@
     switch (code) {
       case "server_not_connected":
       case "server_not_found":
-        return "The Claude NSM connector isn't connected. Add it in claude.ai Settings → Connectors.";
+        return corosSource === "direct"
+          ? "COROS isn't connected on this device. Click Connect COROS on the Connections tab."
+          : "The Claude NSM connector isn't connected. Add it in claude.ai Settings → Connectors.";
       case "needs_reauth":
-        return "Your Claude NSM connector needs reconnecting in claude.ai Settings → Connectors.";
+        return corosSource === "direct"
+          ? "Your COROS sign-in has expired. Click Reconnect COROS on the Connections tab."
+          : "Your Claude NSM connector needs reconnecting in claude.ai Settings → Connectors.";
+      case "session_unreadable":
+        return "COROS needs a session ID this site isn't allowed to read, so direct sending can't work here. Use intervals.icu or the claude.ai version of the planner.";
       case "selection_required":
         return "You have more than one Claude NSM connector. Choose one when claude.ai asks, then try again.";
       case "not_in_manifest":
@@ -834,17 +840,287 @@
     return corosSent()[isoDate(date)] ? "COROS ✓" : "COROS";
   }
 
-  /** Turns on the COROS buttons when this view can call the viewer's connectors. */
+  // ---------------------------------------------------------------- COROS direct (hosted site)
+  // On GitHub Pages there is no claude.ai connector, so the page signs in to the
+  // COROS MCP server itself: OAuth with PKCE (public client, dynamic registration),
+  // then MCP over Streamable HTTP. Tokens stay in this browser only.
+  const COROS_DISCOVERY = "https://mcp.coros.com/.well-known/oauth-protected-resource/mcp";
+  const CD_KEY = "nsm-coros-direct";
+  const CD_PENDING = "nsm-coros-pending";
+  const CD_SCOPE = "openid mcp.tools offline_access";
+  const MCP_VERSION = "2025-06-18";
+  let corosSource = null; // "connector" (claude.ai) or "direct" (hosted site)
+  let cdSession = null;
+  let rpcId = 10;
+
+  function cdLoad() { try { return JSON.parse(localStorage.getItem(CD_KEY) || "null"); } catch (e) { return null; } }
+  function cdSave(v) { try { if (v) localStorage.setItem(CD_KEY, JSON.stringify(v)); else localStorage.removeItem(CD_KEY); } catch (e) { /* ignore */ } }
+  const cdConnected = () => { const c = cdLoad(); return !!(c && (c.access || c.refresh)); };
+  const redirectUri = () => location.origin + location.pathname;
+  function b64url(bytes) {
+    let str = "";
+    bytes.forEach((b) => { str += String.fromCharCode(b); });
+    return btoa(str).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+  function randomString(n) { const a = new Uint8Array(n); crypto.getRandomValues(a); return b64url(a); }
+  async function pkceChallenge(verifier) {
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
+    return b64url(new Uint8Array(digest));
+  }
+
+  async function getJson(url, opts) {
+    let res;
+    try { res = await fetch(url, opts); } catch (e) {
+      throw { code: "network", message: "Couldn't reach COROS. Check your connection and try again." };
+    }
+    const text = await res.text();
+    let body = null;
+    try { body = text ? JSON.parse(text) : null; } catch (e) { /* not JSON */ }
+    if (!res.ok) {
+      const why = body && (body.error_description || body.error);
+      throw { code: "http", status: res.status, message: why ? String(why) : `COROS returned an error (${res.status}).` };
+    }
+    return body;
+  }
+
+  /** Finds the regional MCP server and its sign-in endpoints. */
+  async function cdDiscover() {
+    const pr = await getJson(COROS_DISCOVERY);
+    const asBase = String(pr.authorization_servers[0]).replace(/\/$/, "");
+    const as = await getJson(asBase + "/.well-known/oauth-authorization-server");
+    return {
+      resource: pr.resource,
+      as: { authorization_endpoint: as.authorization_endpoint, token_endpoint: as.token_endpoint, registration_endpoint: as.registration_endpoint },
+    };
+  }
+
+  /** Registers this site with COROS (once) and sends the viewer to the COROS sign-in page. */
+  async function corosConnect() {
+    const cfg = await cdDiscover();
+    const prev = cdLoad();
+    let clientId = prev && prev.redirectUri === redirectUri() && prev.resource === cfg.resource ? prev.clientId : null;
+    if (!clientId) {
+      let reg;
+      try {
+        reg = await getJson(cfg.as.registration_endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            client_name: "Norwegian Singles Planner",
+            redirect_uris: [redirectUri()],
+            grant_types: ["authorization_code", "refresh_token"],
+            response_types: ["code"],
+            token_endpoint_auth_method: "none",
+            scope: CD_SCOPE,
+          }),
+        });
+      } catch (e) {
+        throw { message: `COROS didn't accept this site for sign-in (${e.message}). Use intervals.icu or the claude.ai version of the planner instead.` };
+      }
+      clientId = reg && reg.client_id;
+      if (!clientId) throw { message: "COROS didn't return an app ID for this site." };
+    }
+    cdSave({ ...cfg, clientId, redirectUri: redirectUri() });
+    const verifier = randomString(48);
+    const stateParam = randomString(16);
+    try { localStorage.setItem(CD_PENDING, JSON.stringify({ verifier, state: stateParam })); } catch (e) { /* ignore */ }
+    const url = new URL(cfg.as.authorization_endpoint);
+    const params = {
+      response_type: "code", client_id: clientId, redirect_uri: redirectUri(), scope: CD_SCOPE,
+      state: stateParam, code_challenge: await pkceChallenge(verifier), code_challenge_method: "S256", resource: cfg.resource,
+    };
+    Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+    location.assign(url.toString());
+  }
+
+  function tokenRequest(cfg, params) {
+    return getJson(cfg.as.token_endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams(params).toString(),
+    });
+  }
+  function cdStoreTokens(cfg, tok) {
+    cdSave({
+      ...cfg,
+      access: tok.access_token,
+      refresh: tok.refresh_token || cfg.refresh || null,
+      expiresAt: Date.now() + Math.max(60, (Number(tok.expires_in) || 3600) - 60) * 1000,
+    });
+  }
+
+  /** Completes sign-in when COROS sends the viewer back with ?code=… */
+  async function corosHandleRedirect() {
+    const p = new URLSearchParams(location.search);
+    if (!p.has("code") && !p.has("error")) return;
+    let pending = null;
+    try { pending = JSON.parse(localStorage.getItem(CD_PENDING) || "null"); localStorage.removeItem(CD_PENDING); } catch (e) { /* ignore */ }
+    history.replaceState(null, "", location.pathname + "#intervals");
+    showTab("intervals");
+    if (p.has("error")) {
+      corosStatus(`COROS sign-in didn't complete: ${p.get("error_description") || p.get("error")}.`, true);
+      return;
+    }
+    const cfg = cdLoad();
+    if (!pending || !cfg || pending.state !== p.get("state")) {
+      corosStatus("COROS sign-in couldn't be verified. Click Connect COROS to try again.", true);
+      return;
+    }
+    corosStatus("Finishing COROS sign-in…");
+    try {
+      const tok = await tokenRequest(cfg, {
+        grant_type: "authorization_code", code: p.get("code"), redirect_uri: cfg.redirectUri,
+        client_id: cfg.clientId, code_verifier: pending.verifier, resource: cfg.resource,
+      });
+      cdStoreTokens(cfg, tok);
+      corosStatus("Connected to COROS. Use the COROS buttons on the 12-Week Builder.", false, true);
+    } catch (e) {
+      corosStatus(`COROS sign-in failed: ${e.message}`, true);
+    }
+  }
+
+  async function cdAccessToken() {
+    const cfg = cdLoad();
+    if (!cfg || !(cfg.access || cfg.refresh)) throw { code: "server_not_connected" };
+    if (cfg.access && Date.now() < cfg.expiresAt) return cfg.access;
+    if (!cfg.refresh) throw { code: "needs_reauth" };
+    try {
+      const tok = await tokenRequest(cfg, { grant_type: "refresh_token", refresh_token: cfg.refresh, client_id: cfg.clientId, resource: cfg.resource });
+      cdStoreTokens(cfg, tok);
+      return tok.access_token;
+    } catch (e) {
+      throw { code: e.code === "network" ? "upstream_error" : "needs_reauth" };
+    }
+  }
+
+  /** One JSON-RPC message to the COROS MCP server; reads JSON or an SSE stream. */
+  async function mcpPost(token, body, sessionId) {
+    const headers = {
+      "Content-Type": "application/json",
+      Accept: "application/json, text/event-stream",
+      Authorization: "Bearer " + token,
+      "MCP-Protocol-Version": MCP_VERSION,
+    };
+    if (sessionId) headers["Mcp-Session-Id"] = sessionId;
+    let res;
+    try {
+      res = await fetch(cdLoad().resource, { method: "POST", headers, body: JSON.stringify(body) });
+    } catch (e) {
+      throw { code: "upstream_error" };
+    }
+    if (res.status === 401) throw { code: "needs_reauth" };
+    if (res.status === 202) return { res, msg: null };
+    if (res.status === 404 && sessionId) throw { code: "session_expired" };
+    if (res.status === 400 && !sessionId && body.method === "tools/call") throw { code: "session_unreadable" };
+    if (!res.ok) throw { code: "upstream_error", message: `COROS returned an error (${res.status}).` };
+    const text = await res.text();
+    const type = res.headers.get("content-type") || "";
+    let msg = null;
+    if (type.includes("text/event-stream")) {
+      text.split(/\r?\n/).forEach((line) => {
+        if (!line.startsWith("data:")) return;
+        try { const j = JSON.parse(line.slice(5).trim()); if (j && j.id === body.id) msg = j; } catch (e) { /* skip */ }
+      });
+    } else if (text) {
+      try { msg = JSON.parse(text); } catch (e) { /* not JSON */ }
+    }
+    return { res, msg };
+  }
+
+  async function cdEnsureSession(token) {
+    if (cdSession) return cdSession;
+    const { res, msg } = await mcpPost(token, {
+      jsonrpc: "2.0", id: 1, method: "initialize",
+      params: { protocolVersion: MCP_VERSION, capabilities: {}, clientInfo: { name: "norwegian-singles-planner", version: "1.0" } },
+    });
+    if (!msg || msg.error) throw { code: "upstream_error", message: "COROS didn't start a session." };
+    const id = res.headers.get("mcp-session-id");
+    await mcpPost(token, { jsonrpc: "2.0", method: "notifications/initialized" }, id);
+    cdSession = { id };
+    return cdSession;
+  }
+
+  /** Same callTool shape as the claude.ai connector, so the COROS buttons work with either. */
+  const directCoros = {
+    callTool: async (server, tool, input) => {
+      const token = await cdAccessToken();
+      for (let attempt = 0; ; attempt++) {
+        const sess = await cdEnsureSession(token);
+        try {
+          const { msg } = await mcpPost(token, { jsonrpc: "2.0", id: ++rpcId, method: "tools/call", params: { name: tool, arguments: input } }, sess.id);
+          if (!msg) throw { code: "upstream_error" };
+          if (msg.error) throw { code: "tool_error", message: msg.error.message || "COROS reported an error." };
+          const r = msg.result || {};
+          if (r.isError) throw { code: "tool_error", message: (r.content || []).map((c) => c.text || "").join(" ").trim() };
+          return { payload: r.structuredContent || r };
+        } catch (e) {
+          // An expired session is refused before the tool runs, so one retry is safe.
+          if (e.code === "session_expired" && attempt === 0) { cdSession = null; continue; }
+          throw e;
+        }
+      }
+    },
+  };
+
+  function corosStatus(text, isError, ok) {
+    const el = document.getElementById("coros-msg");
+    if (!el) return;
+    el.textContent = text;
+    el.classList.toggle("error", !!isError);
+    el.classList.toggle("ok", !!ok);
+  }
+
+  /** Shows the right COROS controls for this view. */
+  function updateCorosUi() {
+    if (corosSource !== "connector" && PUSH_ENABLED && cdConnected()) {
+      corosMcp = directCoros;
+      corosSource = "direct";
+    }
+    document.querySelectorAll(".coros-only").forEach((el) => { el.hidden = corosSource !== "connector"; });
+    document.querySelectorAll(".coros-direct").forEach((el) => { el.hidden = !(PUSH_ENABLED && corosSource !== "connector"); });
+    document.querySelectorAll(".coros-absent").forEach((el) => { el.hidden = !!corosSource || PUSH_ENABLED; });
+    const allBtn = document.getElementById("btn-coros-all");
+    if (allBtn) allBtn.hidden = !corosMcp;
+    const connectBtn = document.getElementById("btn-coros-connect");
+    const disconnectBtn = document.getElementById("btn-coros-disconnect");
+    if (connectBtn) connectBtn.textContent = corosSource === "direct" ? "Reconnect COROS" : "Connect COROS";
+    if (disconnectBtn) disconnectBtn.hidden = corosSource !== "direct";
+  }
+
+  /** Turns on COROS sending: claude.ai connector when available, else direct sign-in on the hosted site. */
   function initCoros() {
+    updateCorosUi();
+    if (PUSH_ENABLED) {
+      corosHandleRedirect().then(() => { updateCorosUi(); renderAll(); });
+      const connectBtn = document.getElementById("btn-coros-connect");
+      connectBtn.addEventListener("click", async () => {
+        connectBtn.disabled = true;
+        corosStatus("Opening COROS sign-in…");
+        try { await corosConnect(); } catch (e) {
+          corosStatus(e.message || "Couldn't start COROS sign-in.", true);
+          connectBtn.disabled = false;
+        }
+      });
+      document.getElementById("btn-coros-disconnect").addEventListener("click", () => {
+        const cfg = cdLoad();
+        if (cfg) cdSave({ ...cfg, access: null, refresh: null, expiresAt: 0 });
+        cdSession = null;
+        corosMcp = null;
+        corosSource = null;
+        corosStatus("Disconnected from COROS on this device.");
+        updateCorosUi();
+        renderAll();
+      });
+    }
     const c = window.claude;
     if (!c || typeof c.use !== "function") return;
     c.use("mcp").then((m) => {
       if (!m) return;
       corosMcp = m;
-      document.querySelectorAll(".coros-only").forEach((el) => { el.hidden = false; });
-      document.querySelectorAll(".coros-absent").forEach((el) => { el.hidden = true; });
+      corosSource = "connector";
+      updateCorosUi();
       renderAll();
-    }).catch(() => { /* stay without COROS */ });
+    }).catch(() => { /* stay without the connector */ });
   }
 
   const weekEvents = (wk) => wk.days.map((d, i) => (d.type === "rest" ? null : icuEvent(wk, d, i))).filter(Boolean);
