@@ -7,7 +7,6 @@
 
   // ---------------------------------------------------------------- constants
   const KM_PER_MI = 1.609344;
-  const RIEGEL = 1.06;
   const STORAGE_KEY = "nsm-planner-v1";
   const MIN_EASY_KM = 3;
   const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -17,6 +16,7 @@
     { key: "10k", label: "10k", m: 10000 },
     { key: "15k", label: "15k", m: 15000 },
     { key: "hm", label: "Half marathon", m: 21097.5 },
+    { key: "25k", label: "25k", m: 25000 },
     { key: "30k", label: "30k", m: 30000 },
     { key: "m", label: "Marathon", m: 42195 },
   ];
@@ -103,8 +103,34 @@
     return h ? `${h}:${String(m).padStart(2, "0")}:${ss}` : `${m}:${ss}`;
   }
 
-  function riegel(t1, d1, d2) {
-    return t1 * Math.pow(d2 / d1, RIEGEL);
+  // ---------------------------------------------------------------- Daniels VDOT
+  // Daniels & Gilbert (1979): the equations behind the VDOT tables.
+  // v = velocity in metres/min, t = race duration in minutes.
+  function vo2AtVelocity(v) {
+    return -4.60 + 0.182258 * v + 0.000104 * v * v;
+  }
+  function fractionSustainable(t) {
+    return 0.8 + 0.1894393 * Math.exp(-0.012778 * t) + 0.2989558 * Math.exp(-0.1932605 * t);
+  }
+  function vdotFromRace(metres, seconds) {
+    const t = seconds / 60;
+    return vo2AtVelocity(metres / t) / fractionSustainable(t);
+  }
+  /** Predicted race time (seconds) for a distance at a given VDOT. */
+  function raceTimeForVdot(vdot, metres) {
+    let lo = metres / 600, hi = metres / 50; // minutes: 600 m/min down to 50 m/min
+    for (let i = 0; i < 80; i++) {
+      const mid = (lo + hi) / 2;
+      if (vdotFromRace(metres, mid * 60) > vdot) lo = mid; else hi = mid;
+    }
+    return ((lo + hi) / 2) * 60;
+  }
+  /** Seconds per km at a given fraction of VDOT (Daniels training intensities). */
+  function paceAtPercent(vdot, pct) {
+    const target = vdot * pct;
+    const a = 0.000104, b = 0.182258, c = -4.60 - target;
+    const v = (-b + Math.sqrt(b * b - 4 * a * c)) / (2 * a);
+    return 60000 / v;
   }
 
   // ---------------------------------------------------------------- state
@@ -137,6 +163,16 @@
     const f = (x) => fmtTime(state.units === "mi" ? x * KM_PER_MI : x);
     return `${f(a)}–${f(b)}${unitPace()}`;
   }
+  /** Range object {lo, hi} (sec/km) → "4:10–4:16/km". */
+  function rangeOf(r) { return paceRange(r.lo, r.hi); }
+  const mid = (r) => (r.lo + r.hi) / 2;
+  function repRange(r, km, label) {
+    return `${label}: ${fmtTime(r.lo * km)}–${fmtTime(r.hi * km)}`;
+  }
+  function timeRange(r, min) {
+    const m = (p) => Math.round((min * 60) / p * 1000 / 10) * 10;
+    return `${min} min ≈ ${m(r.hi)}–${m(r.lo)} m`;
+  }
   function dist(km, digits = 1) {
     const v = state.units === "mi" ? km / KM_PER_MI : km;
     return `${v.toFixed(digits)} ${unitDist()}`;
@@ -151,23 +187,27 @@
     const minPace = pbSec / (pbM / 1000);
     if (minPace < 150 || minPace > 600) return null; // 2:30–10:00 per km sanity range
 
+    const vdot = vdotFromRace(pbM, pbSec);
     const races = {};
     RACES.forEach((r) => {
-      const t = r.m === pbM ? pbSec : riegel(pbSec, pbM, r.m);
+      const t = r.m === pbM ? pbSec : raceTimeForVdot(vdot, r.m);
       races[r.key] = { ...r, time: t, pace: t / (r.m / 1000), isPB: r.m === pbM };
     });
 
+    // Every pace is a range: fast end (lo) and slow end (hi), in sec/km.
     const adj = Number(state.paceAdjust) || 0;
-    const mp = races.m.pace;
+    const band = (fast, slow, a = 0) => ({ lo: fast + a, hi: slow + a });
+    const rp = (k) => races[k].pace;
     const paces = {
-      easyLo: mp * 1.12,
-      easyHi: mp * 1.25,
-      short: races["15k"].pace + adj,
-      medium: races.hm.pace + adj,
-      long: races["30k"].pace + adj,
-      hills: races["10k"].pace,
+      easy: band(paceAtPercent(vdot, 0.74), paceAtPercent(vdot, 0.62)),
+      marathon: band(rp("m") - 3, rp("m") + 3),
+      threshold: band(paceAtPercent(vdot, 0.88), paceAtPercent(vdot, 0.83)),
+      short: band(rp("15k"), rp("hm"), adj),
+      medium: band(rp("hm"), rp("25k"), adj),
+      long: band(rp("25k"), rp("30k"), adj),
+      hills: band(rp("10k"), rp("15k")),
     };
-    return { races, paces, pbSec, pbM };
+    return { races, paces, pbSec, pbM, vdot };
   }
 
   // ---------------------------------------------------------------- tab 1: paces
@@ -190,17 +230,18 @@
         <td class="num">${fmtTime(x.time)}</td><td class="num">${pace(x.pace)}</td></tr>`;
     }).join("");
 
-    const p = m.paces;
-    const repLine = (secPerKm, km, label) => `${label}: ${fmtTime(secPerKm * km)}`;
-    const timeLine = (secPerKm, min) => `${min} min ≈ ${Math.round((min * 60) / secPerKm * 1000)} m`;
+    document.getElementById("vdot-value").textContent = m.vdot.toFixed(1);
 
+    const p = m.paces;
     const rows = [
-      ["Easy / recovery", "Marathon pace + 12–25%", paceRange(p.easyLo, p.easyHi), "Conversational. Go slower if you need to."],
-      ["Long run", "Easy pace", paceRange(p.easyLo, p.easyHi), "Easy all the way, typically 20–25% of weekly volume"],
-      ["Sub-T short", "≈ 15k race pace", pace(p.short), `${repLine(p.short, 1, "1 km")} · ${timeLine(p.short, 3)} · 60s rest`],
-      ["Sub-T medium", "≈ Half marathon pace", pace(p.medium), `${repLine(p.medium, 2, "2 km")} · ${timeLine(p.medium, 6)} · 60s rest`],
-      ["Sub-T long", "≈ 30k race pace", pace(p.long), `${repLine(p.long, 3, "3 km")} · ${timeLine(p.long, 10)} · 60–90s rest`],
-      ["400s / hills", "≈ 10k race pace / effort", pace(p.hills), `${repLine(p.hills, 0.4, "400 m")} · 30s rest (or 200 m hills, jog down)`],
+      ["Easy / recovery", "Daniels E (62–74% VDOT)", rangeOf(p.easy), "Conversational. Go slower if you need to."],
+      ["Long run", "Daniels E", rangeOf(p.easy), "Easy all the way, typically 20–25% of weekly volume"],
+      ["Sub-T short", "15k → half marathon pace", rangeOf(p.short), `${repRange(p.short, 1, "1 km")} · ${timeRange(p.short, 3)} · 60s rest`],
+      ["Sub-T medium", "Half marathon → 25k pace", rangeOf(p.medium), `${repRange(p.medium, 2, "2 km")} · ${timeRange(p.medium, 6)} · 60s rest`],
+      ["Sub-T long", "25k → 30k pace", rangeOf(p.long), `${repRange(p.long, 3, "3 km")} · ${timeRange(p.long, 10)} · 60–90s rest`],
+      ["400s / hills", "10k → 15k pace", rangeOf(p.hills), `${repRange(p.hills, 0.4, "400 m")} · 30s rest (or 200 m hills, jog down)`],
+      ["For reference: Daniels T", "83–88% VDOT", rangeOf(p.threshold), "Classic Daniels threshold. Don't run sub-T reps faster than its fast end."],
+      ["For reference: marathon", "VDOT marathon prediction ± 3 s/km", rangeOf(p.marathon), ""],
     ];
     paceBody.innerHTML = rows.map((r) =>
       `<tr><td><strong>${r[0]}</strong></td><td>${r[1]}</td><td class="num">${r[2]}</td><td class="reps">${r[3]}</td></tr>`
@@ -244,8 +285,8 @@
   /** Builds a session object for one day (without easy-day distances, filled later). */
   function buildSession(type, w, wv, p, fmt, raceKm) {
     if (type === "rest") return { type, title: "Rest", detail: "Rest or cross-train", km: 0 };
-    if (type === "easy") return { type, title: "Easy", detail: paceRange(p.easyLo, p.easyHi), km: null };
-    if (type === "longrun") return { type, title: "Long run", detail: `Easy, ${paceRange(p.easyLo, p.easyHi)}`, km: null };
+    if (type === "easy") return { type, title: "Easy", detail: rangeOf(p.easy), km: null };
+    if (type === "longrun") return { type, title: "Long run", detail: `Easy, ${rangeOf(p.easy)}`, km: null };
 
     if (type === "race") {
       const label = state.pbDistance === "10000" ? "10k" : "5k";
@@ -262,7 +303,7 @@
       const n = wv.hills;
       return {
         type, title: "400s / hills",
-        detail: `${n} × 400 m @ ${pace(p.hills)} (${fmtTime(p.hills * 0.4)}), 30s rest, or ${n} × 200 m hills, jog down`,
+        detail: `${n} × 400 m @ ${rangeOf(p.hills)} (${fmtTime(p.hills.lo * 0.4)}–${fmtTime(p.hills.hi * 0.4)}), 30s rest, or ${n} × 200 m hills, jog down`,
         km: 3 + n * 0.4 + (n - 1) * 0.08 + 2,
       };
     }
@@ -272,10 +313,10 @@
     const pc = p[type];
     let detail, repKm;
     if (fmt === "time") {
-      detail = `${n} × ${s.min} min @ ${pace(pc)}, ${s.recS}s jog`;
-      repKm = n * (s.min * 60) / pc;
+      detail = `${n} × ${s.min} min @ ${rangeOf(pc)}, ${s.recS}s jog`;
+      repKm = n * (s.min * 60) / mid(pc);
     } else {
-      detail = `${n} × ${s.distLabel} @ ${pace(pc)} (${fmtTime(pc * s.distKm)}), ${s.recS}s jog`;
+      detail = `${n} × ${s.distLabel} @ ${rangeOf(pc)} (${fmtTime(pc.lo * s.distKm)}–${fmtTime(pc.hi * s.distKm)}), ${s.recS}s jog`;
       repKm = n * s.distKm;
     }
     const recKm = (n - 1) * (s.recS / 420); // slow jog ≈ 7:00/km
@@ -357,7 +398,7 @@
       return;
     }
     const pbLabel = m.pbM === 10000 ? "10k" : "5k";
-    summary.innerHTML = `Using your <strong>${pbLabel} PB of ${fmtTime(m.pbSec)}</strong>. Sub-T paces: short ${pace(m.paces.short)} · medium ${pace(m.paces.medium)} · long ${pace(m.paces.long)}. <a href="#paces">Change</a>`;
+    summary.innerHTML = `Using your <strong>${pbLabel} PB of ${fmtTime(m.pbSec)}</strong>. VDOT ${m.vdot.toFixed(1)}. Sub-T paces: short ${rangeOf(m.paces.short)} · medium ${rangeOf(m.paces.medium)} · long ${rangeOf(m.paces.long)}. <a href="#paces">Change</a>`;
 
     const weeks = buildPlan(m);
     const warns = templateWarnings();

@@ -169,3 +169,8 @@ table.data tr.pb-row td { font-weight: 700; }
   .week { border-color: #999; }
   .day { min-height: 0; }
 }
+
+.vdot-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.vdot-head h2 { margin: 0; }
+.vdot { color: var(--muted); font-weight: 600; }
+.vdot strong { color: var(--accent); font-size: 1.5rem; font-variant-numeric: tabular-nums; margin-left: 4px; }
