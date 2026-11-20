@@ -356,6 +356,32 @@
     };
   }
 
+  /** Estimated duration of a session in seconds: warm-up, reps, recoveries and cool-down at their paces. */
+  function sessionSeconds(d, p) {
+    const easy = mid(p.easy);
+    if (d.type === "rest") return 0;
+    if (d.type === "easy" || d.type === "longrun") {
+      return d.km * easy + (d.strides ? 6 * (20 + 60) : 0);
+    }
+    let t = (d.wu || 0) * easy + (d.cd || 0) * easy;
+    if (d.type === "race") return t + d.raceKm * d.racePace;
+    const r = d.reps;
+    if (!r) return d.km * easy;
+    const work = r.stepKm ? r.n * r.stepKm * mid(r.pace) : r.n * r.stepMin * 60;
+    return t + work + (r.n - 1) * r.recS;
+  }
+
+  /** 2700 → "45 min", 4500 → "1 h 15 min". */
+  function fmtDuration(sec) {
+    const mins = Math.round(sec / 60);
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    if (!h) return `${m} min`;
+    return m ? `${h} h ${String(m).padStart(2, "0")} min` : `${h} h`;
+  }
+  /** 18600 → "5.2h" for compact chart labels. */
+  const fmtHours = (sec) => `${(sec / 3600).toFixed(1)}h`;
+
   function buildPlan(m) {
     const p = m.paces;
     const vp = volumePlan();
@@ -402,12 +428,14 @@
       easyDays.forEach((d) => { d.km = easyEach; });
 
       const totalKm = days.reduce((a, d) => a + (d.km || 0), 0);
+      days.forEach((d) => { d.sec = sessionSeconds(d, p); });
+      const totalSec = days.reduce((a, d) => a + d.sec, 0);
       const subtKm = days.filter((d) => d.repKm).reduce((a, d) => a + d.repKm, 0);
       const weekStart = new Date(start);
       weekStart.setDate(start.getDate() + 7 * w);
 
       weeks.push({
-        n: w + 1, phase: phaseFor(w), deload: vw.deload, atPeak: vw.atPeak, fmt, days, totalKm, targetKm, subtKm, tooLow, weekStart,
+        n: w + 1, phase: phaseFor(w), deload: vw.deload, atPeak: vw.atPeak, fmt, days, totalKm, totalSec, targetKm, subtKm, tooLow, weekStart,
       });
     }
     weeks.volume = vp;
@@ -473,7 +501,7 @@
         const date = new Date(wk.weekStart);
         date.setDate(date.getDate() + i);
         const cls = d.type === "race" ? "race" : SESSION_TYPES[d.type]?.cls || "easy";
-        const kmTxt = d.km ? `${dist(d.km)}${d.wuNote ? " incl. WU/CD" : ""}` : "";
+        const kmTxt = d.km ? `${dist(d.km)}${d.wuNote ? " incl. WU/CD" : ""} · ~${fmtDuration(d.sec)}` : "";
         return `<div class="day ${cls}">
           <div class="day-name">${DAYS[i]} <span class="hint">${fmtShortDate(date)}</span></div>
           <div class="day-title">${d.title}</div>
@@ -491,6 +519,7 @@
             <span>${wk.fmt === "time" ? "Time reps" : "Distance reps"}</span>
             <span>Sub-T ${dist(wk.subtKm, 0)} (${Math.round(wk.subtKm / wk.totalKm * 100)}%)</span>
             <span><strong>${dist(wk.totalKm, 0)}</strong> total${changeTxt(wk, weeks)}</span>
+            <span>~${fmtDuration(wk.totalSec)}</span>
           </div>
         </div>
         <div class="days">${days}</div>
@@ -516,13 +545,14 @@
     if (d.type === "easy" || d.type === "longrun") {
       const lines = [head, `${dist(d.km)} easy @ ${rangeOf(lastPaces.easy)}`];
       if (d.strides) lines.push(`Finish with ${d.strides}, fast but relaxed, full recovery between`);
+      lines.push(`Est. time: ~${fmtDuration(d.sec)}`);
       return lines.join("\n");
     }
     const lines = [head];
     if (d.wu) lines.push(`Warm-up: ${dist(d.wu)} easy${d.wuExtra || ""}`);
     lines.push(d.main || d.detail);
     if (d.cd) lines.push(`Cool-down: ${dist(d.cd)} easy`);
-    lines.push(`Total: ${dist(d.km)}`);
+    lines.push(`Total: ${dist(d.km)} · est. ~${fmtDuration(d.sec)}`);
     return lines.join("\n");
   }
 
@@ -587,6 +617,7 @@
       name: d.title,
       description: icuDescription(wk, d),
       external_id: `nsm-${day}`,
+      moving_time: Math.round(d.sec),
     };
   }
 
@@ -701,8 +732,8 @@
     if (trialLegend) trialLegend.hidden = phaseKey(11) !== "trial";
     const toUnit = (km) => (state.units === "mi" ? km / KM_PER_MI : km);
     const W = Math.max(host.clientWidth || 0, 300);
-    const H = 230;
-    const M = { top: 20, right: 8, bottom: 26, left: 38 };
+    const H = 244;
+    const M = { top: 20, right: 8, bottom: 40, left: 38 };
     const pw = W - M.left - M.right;
     const ph = H - M.top - M.bottom;
 
@@ -714,6 +745,7 @@
     const band = pw / weeks.length;
     const gap = Math.max(2, band * 0.28);
     const bw = band - gap;
+    const compactTime = band < 36; // narrow screens: drop the "h" so labels don't touch
 
     const full = (i) => !weeks[i].deload && !weeks.volume.weeks[i].taper;
     const peakIdx = vals.indexOf(Math.max(...vals));
@@ -729,6 +761,9 @@
       svg += `<line class="grid" x1="${M.left}" x2="${W - M.right}" y1="${yy}" y2="${yy}"/>`;
       svg += `<text class="axis" x="${M.left - 6}" y="${yy + 4}" text-anchor="end">${Math.round(v)}</text>`;
     }
+    // row captions: units for the bars and the estimated-time row
+    svg += `<text class="axis" x="${M.left - 6}" y="${M.top - 8}" text-anchor="end">${unitDist()}</text>`;
+    svg += `<text class="axis time-label" x="${M.left - 6}" y="${H - 6}" text-anchor="end">${compactTime ? "Hrs" : "Time"}</text>`;
     // peak target
     const py = Math.round(y(peak)) + 0.5;
     svg += `<line class="peak-line" x1="${M.left}" x2="${W - M.right}" y1="${py}" y2="${py}"/>`;
@@ -745,11 +780,12 @@
       if (labelled.has(i)) {
         svg += `<text class="bar-label" x="${x + bw / 2}" y="${top - 5}" text-anchor="middle">${Math.round(vals[i])}</text>`;
       }
-      svg += `<text class="axis" x="${x + bw / 2}" y="${H - 8}" text-anchor="middle">${band < 30 ? i + 1 : "W" + (i + 1)}</text>`;
+      svg += `<text class="axis" x="${x + bw / 2}" y="${H - 22}" text-anchor="middle">${band < 30 ? i + 1 : "W" + (i + 1)}</text>`;
+      svg += `<text class="axis time-label" x="${x + bw / 2}" y="${H - 6}" text-anchor="middle">${compactTime ? (wk.totalSec / 3600).toFixed(1) : fmtHours(wk.totalSec)}</text>`;
     });
     // hit targets on top (full column height)
     weeks.forEach((wk, i) => {
-      svg += `<rect class="hit" tabindex="0" data-i="${i}" x="${M.left + i * band}" y="${M.top}" width="${band}" height="${ph + M.bottom}" aria-label="Week ${i + 1}: ${Math.round(vals[i])} ${unitDist()}"/>`;
+      svg += `<rect class="hit" tabindex="0" data-i="${i}" x="${M.left + i * band}" y="${M.top}" width="${band}" height="${ph + M.bottom}" aria-label="Week ${i + 1}: ${Math.round(vals[i])} ${unitDist()}, about ${fmtDuration(wk.totalSec)}"/>`;
     });
     svg += `</svg><div class="chart-tip" hidden></div>`;
     host.innerHTML = svg;
@@ -757,11 +793,14 @@
     // 12-week totals below the chart.
     const total = weeks.reduce((t, w) => t + w.totalKm, 0);
     const subt = weeks.reduce((t, w) => t + w.subtKm, 0);
+    const totalTime = weeks.reduce((t, w) => t + w.totalSec, 0);
     const totalEl = document.getElementById("volume-total");
     if (totalEl) {
       totalEl.innerHTML =
         `<div class="stat"><span class="stat-label">12-week total</span><span class="stat-value">${dist(total, 0)}</span></div>` +
         `<div class="stat"><span class="stat-label">Weekly average</span><span class="stat-value">${dist(total / weeks.length, 0)}</span></div>` +
+        `<div class="stat"><span class="stat-label">Est. total time</span><span class="stat-value">${fmtDuration(totalTime)}</span></div>` +
+        `<div class="stat"><span class="stat-label">Avg time / week</span><span class="stat-value">${fmtDuration(totalTime / weeks.length)}</span></div>` +
         `<div class="stat"><span class="stat-label">Sub-T reps</span><span class="stat-value">${dist(subt, 0)} <small>(${Math.round(subt / total * 100)}%)</small></span></div>`;
     }
 
@@ -777,7 +816,7 @@
       } else if (wk.deload) change = "Lighter week";
       else if (weeks.volume.weeks[i].taper) change = state.finalWeek === "race" ? "Taper + race" : "Time trial week";
       tip.innerHTML = `<i class="sw ph-${phaseKey(i)}"></i> <strong>Week ${wk.n}</strong> · ${wk.phase}<br>` +
-        `<span class="tip-val">${dist(wk.totalKm, 0)}</span>${change ? ` · ${change}` : ""}<br>` +
+        `<span class="tip-val">${dist(wk.totalKm, 0)}</span> · ~${fmtDuration(wk.totalSec)}${change ? `<br>${change}` : ""}<br>` +
         `Sub-T ${dist(wk.subtKm, 0)}`;
       tip.hidden = false;
       cols.forEach((c) => c.classList.toggle("on", Number(c.dataset.i) === i));
@@ -812,12 +851,12 @@
     const m = model();
     if (!m) return;
     const weeks = buildPlan(m);
-    const rows = [["Week", "Phase", "Date", "Day", "Session", "Details", `Distance (${unitDist()})`]];
+    const rows = [["Week", "Phase", "Date", "Day", "Session", "Details", `Distance (${unitDist()})`, "Est. time (min)"]];
     weeks.forEach((wk) => wk.days.forEach((d, i) => {
       const date = new Date(wk.weekStart);
       date.setDate(date.getDate() + i);
       const km = d.km ? (state.units === "mi" ? d.km / KM_PER_MI : d.km).toFixed(1) : "";
-      rows.push([wk.n, wk.phase, isoDate(date), DAYS[i], d.title, d.detail, km]);
+      rows.push([wk.n, wk.phase, isoDate(date), DAYS[i], d.title, d.detail, km, d.sec ? Math.round(d.sec / 60) : ""]);
     }));
     const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\r\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });

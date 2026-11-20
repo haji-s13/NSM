@@ -200,6 +200,7 @@ table.data tr.pb-row td { font-weight: 700; }
 .chart .axis { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
 .chart .bar-label { fill: var(--text); font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .chart .peak-line { stroke: var(--muted); stroke-width: 1.5; stroke-dasharray: 5 4; }
+.chart .time-label { font-size: 10px; font-weight: 600; }
 .chart .peak-label { fill: var(--muted); font-size: 11px; font-weight: 600; }
 .chart .bar.ph-base { fill: var(--ph-base); }
 .chart .bar.ph-build { fill: var(--ph-build); }
