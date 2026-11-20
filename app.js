@@ -526,12 +526,12 @@
           <div class="day-title">${d.title}</div>
           <div class="day-detail">${detailHtml}</div>
           ${kmTxt ? `<div class="day-dist">${kmTxt}</div>` : ""}
-          ${d.type !== "rest" ? `<div class="day-actions"><button type="button" class="copy-btn" data-week="${wk.n - 1}" data-day="${i}" aria-label="Copy ${DAYS[i]} week ${wk.n} workout">Copy</button>${PUSH_ENABLED ? `<button type="button" class="copy-btn push-day" data-week="${wk.n - 1}" data-day="${i}" aria-label="Send ${DAYS[i]} week ${wk.n} workout to intervals.icu">Send</button>` : ""}</div>` : ""}
+          ${d.type !== "rest" ? `<div class="day-actions"><button type="button" class="copy-btn" data-week="${wk.n - 1}" data-day="${i}" aria-label="Copy ${DAYS[i]} week ${wk.n} workout">Copy</button>${PUSH_ENABLED ? `<button type="button" class="copy-btn push-day" data-week="${wk.n - 1}" data-day="${i}" aria-label="Send ${DAYS[i]} week ${wk.n} workout to intervals.icu">Send</button>` : ""}${corosMcp ? `<button type="button" class="copy-btn coros-day${corosSent()[isoDate(date)] ? " sent" : ""}" data-week="${wk.n - 1}" data-day="${i}" aria-label="Add ${DAYS[i]} week ${wk.n} workout to COROS">${corosButtonLabel(date)}</button>` : ""}</div>` : ""}
         </div>`;
       }).join("");
       return `<article class="week">
         <div class="week-head">
-          <h3>Week ${wk.n} <span class="hint">· ${fmtShortDate(wk.weekStart)}</span>${PUSH_ENABLED ? ` <button type="button" class="copy-btn push-week" data-week="${wk.n - 1}">Send week</button>` : ""}</h3>
+          <h3>Week ${wk.n} <span class="hint">· ${fmtShortDate(wk.weekStart)}</span>${PUSH_ENABLED ? ` <button type="button" class="copy-btn push-week" data-week="${wk.n - 1}">Send week</button>` : ""}${corosMcp ? ` <button type="button" class="copy-btn coros-week" data-week="${wk.n - 1}">COROS week</button>` : ""}</h3>
           <div class="week-meta">
             <span class="pill phase">${wk.phase}</span>
             ${wk.deload ? `<span class="pill phase">Lighter week</span>` : ""}
@@ -696,6 +696,155 @@
     } finally {
       setTimeout(() => { btn.textContent = original; btn.disabled = false; btn.classList.remove("done"); }, 2000);
     }
+  }
+
+  // ---------------------------------------------------------------- COROS (via the "Claude NSM" connector)
+  // Only available when the page runs inside claude.ai with the connector; hidden elsewhere.
+  const COROS_SERVER = "Claude NSM";
+  const COROS_TOOL = "createScheduledWorkout";
+  const COROS_SENT_KEY = "nsm-coros-sent";
+  let corosMcp = null;
+  let corosAll = false; // "Send all" waiting for a confirming second click
+
+  const clampPace = (sec) => Math.min(1499, Math.max(120, Math.round(sec)));
+  const paceTarget = (r) => ({ intensityType: 2, intensityValueStart: clampPace(r.lo), intensityValueEnd: clampPace(r.hi) });
+  const onePace = (sec) => ({ intensityType: 2, intensityValueStart: clampPace(sec), intensityValueEnd: clampPace(sec) });
+  const metres = (km) => Math.max(1, Math.round(km * 1000));
+
+  /** COROS course for one planner day (createScheduledWorkout input shape). */
+  function corosCourse(wk, d) {
+    const easy = paceTarget(lastPaces.easy);
+    const sections = [];
+    if (d.type === "easy" || d.type === "longrun") {
+      sections.push({ sectionType: 2, targetType: 1, targetValue: metres(d.km), ...easy });
+      if (d.strides) {
+        sections.push({ intervalGroup: true, repeats: 6, sets: [
+          { sectionType: 2, targetType: 2, targetValue: 20, ...onePace(lastPaces.hills.lo - 15) },
+          { sectionType: 3, targetType: 2, targetValue: 60, ...easy },
+        ] });
+      }
+    } else {
+      if (d.wu > 0) sections.push({ sectionType: 1, targetType: 1, targetValue: metres(d.wu), ...easy });
+      if (d.type === "race") {
+        sections.push({ sectionType: 2, targetType: 1, targetValue: metres(d.raceKm), ...onePace(d.racePace) });
+      } else if (d.reps) {
+        const r = d.reps;
+        const work = r.stepKm
+          ? { sectionType: 2, targetType: 1, targetValue: metres(r.stepKm), ...paceTarget(r.pace) }
+          : { sectionType: 2, targetType: 2, targetValue: r.stepMin * 60, ...paceTarget(r.pace) };
+        const rec = { sectionType: 3, targetType: 2, targetValue: r.recS, ...easy };
+        for (let left = r.n; left > 0; left -= 20) { // COROS allows at most 20 repeats per group
+          sections.push({ intervalGroup: true, repeats: Math.min(20, left), sets: [work, rec] });
+        }
+      }
+      if (d.cd > 0) sections.push({ sectionType: 4, targetType: 1, targetValue: metres(d.cd), ...easy });
+    }
+    return {
+      sportType: 1,
+      courseName: `${d.type === "easy" && d.strides ? "Easy + strides" : d.title} · Week ${wk.n}`.slice(0, 100),
+      courseDescription: `${workoutText(wk, d)}\nTargets are pace ranges per km.`,
+      sections,
+    };
+  }
+
+  const ymd = (date) => isoDate(date).replace(/-/g, "");
+  function dayDate(wk, i) {
+    const date = new Date(wk.weekStart);
+    date.setDate(date.getDate() + i);
+    return date;
+  }
+  /** COROS accepts dates from today to 90 days ahead. */
+  function inCorosWindow(date) {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const last = new Date(today); last.setDate(last.getDate() + 90);
+    const d = new Date(date); d.setHours(0, 0, 0, 0);
+    return d >= today && d <= last;
+  }
+
+  function corosSent() {
+    try { return JSON.parse(localStorage.getItem(COROS_SENT_KEY) || "{}"); } catch (e) { return {}; }
+  }
+  function markCorosSent(dateKey) {
+    try {
+      const m = corosSent();
+      m[dateKey] = Date.now();
+      localStorage.setItem(COROS_SENT_KEY, JSON.stringify(m));
+    } catch (e) { /* ignore */ }
+  }
+
+  /** Viewer-facing message for a failed connector call, by error code. */
+  function corosError(err) {
+    const code = err && err.code;
+    switch (code) {
+      case "server_not_connected":
+      case "server_not_found":
+        return "The Claude NSM connector isn't connected. Add it in claude.ai Settings → Connectors.";
+      case "needs_reauth":
+        return "Your Claude NSM connector needs reconnecting in claude.ai Settings → Connectors.";
+      case "selection_required":
+        return "You have more than one Claude NSM connector. Choose one when claude.ai asks, then try again.";
+      case "not_in_manifest":
+        return "COROS isn't allowed for this page. Turn it on from the page's Permissions menu.";
+      case "approval_required":
+        return "Sending to COROS needs your approval. Click again and choose Allow.";
+      case "blocked_by_policy":
+        return "Your organization doesn't allow this connector here.";
+      case "tool_error":
+        return `COROS refused the workout: ${(err.message || "").slice(0, 200)}`;
+      case "not_granted":
+      case "capability_disabled":
+      case "capability_removed":
+        return "Sending to COROS isn't available in this view.";
+      default:
+        return "COROS didn't confirm. Check your COROS schedule before sending again, so you don't get a duplicate.";
+    }
+  }
+
+  /** Sends planner days to COROS one at a time; stops at the first failure. */
+  async function corosSend(btn, items, label) {
+    if (!corosMcp || !items.length) return;
+    const original = btn.textContent;
+    btn.disabled = true;
+    let sent = 0, skipped = 0;
+    try {
+      for (const it of items) {
+        if (!inCorosWindow(it.date)) { skipped++; continue; }
+        btn.textContent = items.length > 1 ? `Sending ${sent + 1}/${items.length}…` : "Sending…";
+        await corosMcp.callTool(COROS_SERVER, COROS_TOOL, { date: ymd(it.date), course: corosCourse(it.wk, it.d) });
+        markCorosSent(isoDate(it.date));
+        sent++;
+      }
+      btn.textContent = "In COROS ✓";
+      btn.classList.add("done");
+      const skipTxt = skipped ? ` ${skipped} skipped: COROS only accepts dates from today to 90 days ahead.` : "";
+      pushStatus(sent ? `Added ${sent} workout${sent === 1 ? "" : "s"} (${label}) to your COROS schedule.${skipTxt}` : `Nothing sent.${skipTxt}`, !sent);
+    } catch (e) {
+      btn.textContent = "Failed";
+      pushStatus(`${sent ? `Added ${sent} before stopping. ` : ""}${corosError(e)}`, true);
+    } finally {
+      setTimeout(() => {
+        btn.disabled = false;
+        btn.classList.remove("done");
+        renderAll();
+      }, 2200);
+    }
+  }
+
+  function corosButtonLabel(date) {
+    return corosSent()[isoDate(date)] ? "COROS ✓" : "COROS";
+  }
+
+  /** Turns on the COROS buttons when this view can call the viewer's connectors. */
+  function initCoros() {
+    const c = window.claude;
+    if (!c || typeof c.use !== "function") return;
+    c.use("mcp").then((m) => {
+      if (!m) return;
+      corosMcp = m;
+      document.querySelectorAll(".coros-only").forEach((el) => { el.hidden = false; });
+      document.querySelectorAll(".coros-absent").forEach((el) => { el.hidden = true; });
+      renderAll();
+    }).catch(() => { /* stay without COROS */ });
   }
 
   const weekEvents = (wk) => wk.days.map((d, i) => (d.type === "rest" ? null : icuEvent(wk, d, i))).filter(Boolean);
@@ -1029,6 +1178,31 @@
     document.getElementById("plan").addEventListener("click", (e) => {
       const btn = e.target.closest(".copy-btn");
       if (!btn) return;
+      if (btn.classList.contains("coros-week")) {
+        const wk = lastWeeks[Number(btn.dataset.week)];
+        if (!wk) return;
+        const sentMap = corosSent();
+        const items = wk.days.map((d, i) => ({ wk, d, date: dayDate(wk, i) }))
+          .filter((it) => it.d.type !== "rest" && !sentMap[isoDate(it.date)]);
+        if (!items.length) { pushStatus(`Week ${wk.n} is already in COROS. Use a day's COROS button to send one again.`); return; }
+        corosSend(btn, items, `week ${wk.n}`);
+        return;
+      }
+      if (btn.classList.contains("coros-day")) {
+        const wk = lastWeeks[Number(btn.dataset.week)];
+        const i = Number(btn.dataset.day);
+        if (!wk || !wk.days[i]) return;
+        const date = dayDate(wk, i);
+        if (corosSent()[isoDate(date)] && btn.dataset.confirm !== "1") {
+          btn.dataset.confirm = "1";
+          btn.textContent = "Add again?";
+          pushStatus("This day is already in COROS. Click again to add a second copy, or delete the old one in the COROS app first.");
+          setTimeout(() => { delete btn.dataset.confirm; btn.textContent = corosButtonLabel(date); }, 4000);
+          return;
+        }
+        corosSend(btn, [{ wk, d: wk.days[i], date }], `week ${wk.n} ${DAYS[i]}`);
+        return;
+      }
       if (btn.classList.contains("push-week")) {
         const wk = lastWeeks[Number(btn.dataset.week)];
         if (wk) runPush(btn, weekEvents(wk), `week ${wk.n}`);
@@ -1067,6 +1241,24 @@
       resizeTimer = setTimeout(() => { if (lastWeeks.length) renderVolumeChart(lastWeeks); }, 120);
     });
     showTab(location.hash.slice(1));
+
+    const corosAllBtn = document.getElementById("btn-coros-all");
+    corosAllBtn.addEventListener("click", () => {
+      const sentMap = corosSent();
+      const items = lastWeeks.flatMap((wk) => wk.days.map((d, i) => ({ wk, d, date: dayDate(wk, i) })))
+        .filter((it) => it.d.type !== "rest" && !sentMap[isoDate(it.date)]);
+      if (!items.length) { pushStatus("Every workout is already in COROS."); return; }
+      if (!corosAll) {
+        corosAll = true;
+        corosAllBtn.textContent = `Click again to add ${items.length} workouts`;
+        setTimeout(() => { corosAll = false; corosAllBtn.textContent = "Send all to COROS"; }, 5000);
+        return;
+      }
+      corosAll = false;
+      corosAllBtn.textContent = "Send all to COROS";
+      corosSend(corosAllBtn, items, "all weeks");
+    });
+    initCoros();
 
     renderAll();
   }

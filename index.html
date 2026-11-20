@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Norwegian Singles Planner</title>
   <meta name="description" content="Predicted training paces and a 12-week sub-threshold workout builder for the Norwegian Singles method." />
-  <link rel="stylesheet" href="styles.css?v=11" />
+  <link rel="stylesheet" href="styles.css?v=12" />
 </head>
 <body>
   <header class="site-header">
@@ -18,7 +18,7 @@
   <nav class="tabs wrap" role="tablist">
     <button class="tab" role="tab" id="tab-paces" aria-controls="panel-paces" aria-selected="true">Predicted Paces</button>
     <button class="tab" role="tab" id="tab-builder" aria-controls="panel-builder" aria-selected="false">12-Week Builder</button>
-    <button class="tab" role="tab" id="tab-intervals" aria-controls="panel-intervals" aria-selected="false">intervals.icu</button>
+    <button class="tab" role="tab" id="tab-intervals" aria-controls="panel-intervals" aria-selected="false">Connections</button>
   </nav>
 
   <main class="wrap">
@@ -146,6 +146,7 @@
         <button id="btn-print" class="btn">Print</button>
         <button id="btn-csv" class="btn">Download CSV</button>
         <button id="btn-push-all" class="btn">Send all to intervals.icu</button>
+        <button id="btn-coros-all" class="btn coros-only" hidden>Send all to COROS</button>
         <button id="btn-reset" class="btn btn-ghost">Reset to defaults</button>
         <span id="push-msg" class="push-msg" role="status"></span>
       </div>
@@ -156,6 +157,17 @@
 
     <!-- ================= INTERVALS.ICU ================= -->
     <section id="panel-intervals" role="tabpanel" aria-labelledby="tab-intervals" hidden>
+      <div class="card" id="coros-card">
+        <h2>COROS</h2>
+        <p class="coros-only lead" hidden>Your <strong>Claude NSM</strong> connector is available on this page. On the 12-Week Builder, use <strong>COROS</strong> on a day, <strong>COROS week</strong>, or <strong>Send all to COROS</strong> to add structured workouts with pace ranges straight to your COROS training schedule.</p>
+        <ul class="steps coros-only" hidden>
+          <li>claude.ai asks you to allow the connector the first time you send.</li>
+          <li>COROS accepts workouts from today up to 90 days ahead. Days outside that window are skipped.</li>
+          <li>Sent days show <strong>COROS ✓</strong> on this device. Sending one again adds a second copy, so delete the old one in the COROS app first.</li>
+        </ul>
+        <p class="coros-absent lead">Sending straight to COROS works only when the planner is open on claude.ai with your Claude NSM connector connected. Otherwise, use intervals.icu below, which syncs to COROS.</p>
+      </div>
+
       <div class="card" id="icu-settings">
         <h2>Connect intervals.icu</h2>
         <p class="lead">Connect your intervals.icu account to send planned workouts from the 12-Week Builder. They then sync from intervals.icu to your watch (COROS, Garmin and others) if you've connected it there.</p>
@@ -191,6 +203,6 @@
     <p>Your settings are saved in this browser only.</p>
   </footer>
 
-  <script src="app.js?v=11"></script>
+  <script src="app.js?v=12"></script>
 </body>
 </html>

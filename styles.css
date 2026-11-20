@@ -247,6 +247,8 @@ table.data tr.pb-row td { font-weight: 700; }
 
 .day-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: auto; position: relative; top: 8px; margin-bottom: 8px; }
 .day-actions .copy-btn { margin: 0; position: static; }
+.coros-week { margin-left: 6px; vertical-align: 1px; position: static; top: 0; }
+.copy-btn.sent { border-color: var(--easy-ink); color: var(--easy-ink); }
 .push-week { margin-left: 8px; vertical-align: 1px; position: static; top: 0; }
 .copy-btn:disabled { opacity: .7; cursor: progress; }
 .push-msg { color: var(--muted); font-size: .85rem; align-self: center; }
