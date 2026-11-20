@@ -17,6 +17,7 @@ A static web app (plain HTML, CSS and JavaScript, no build step) with three tabs
    - Optional lighter weeks in weeks 4 and 8
    - Week 12 as a taper and race, a time trial, or a normal week
    - Easy-run distances calculated to fill the weekly volume target
+   - Adjustable warm-up and cool-down distance for all sub-T sessions, shown as separate lines in each day's breakdown
    - Estimated time for each workout and week (warm-up, reps, recoveries and cool-down at their paces)
    - 6 × 20s strides added to the first easy run of each week
    - A weekly volume bar chart coloured by phase (base, build, peak, race/trial), lighter weeks hatched, peak target line, hover for details, estimated hours per week under each bar, and 12-week total, weekly average, average weekly time and sub-T totals below it

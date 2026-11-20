@@ -157,6 +157,9 @@ table.data tr.pb-row td { font-weight: 700; }
 .day-name { font-size: .75rem; font-weight: 700; text-transform: uppercase; color: var(--muted); }
 .day-title { font-weight: 700; margin: 2px 0; font-size: .92rem; }
 .day-detail { font-size: .82rem; }
+.day-detail .seg + .seg { margin-top: 3px; }
+.day-detail .seg-easy { color: var(--muted); }
+.day-detail .seg-main { font-weight: 600; }
 .day-dist { font-size: .78rem; color: var(--muted); margin-top: 4px; }
 .day.easy { background: var(--easy); } .day.easy .day-title { color: var(--easy-ink); }
 .day.subt { background: var(--subt); } .day.subt .day-title { color: var(--subt-ink); }

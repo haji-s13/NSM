@@ -64,6 +64,8 @@
     startVolume: 55,
     peakVolume: 75,
     subtShare: 25,
+    subtWarmupKm: 2,     // always stored in km
+    subtCooldownKm: 1.5, // always stored in km
     repFormat: "distance",
     finalWeek: "race",
     deloads: true,
@@ -331,9 +333,9 @@
       return {
         type, title: "400s / hills",
         detail: `${n} × 400 m @ ${rangeOf(p.hills)} (${fmtTime(p.hills.lo * 0.4)}–${fmtTime(p.hills.hi * 0.4)}), 30s rest, or ${n} × 200 m hills, jog down`,
-        km: 3 + n * 0.4 + (n - 1) * 0.08 + 2,
+        km: wuCd().wu + n * 0.4 + (n - 1) * 0.08 + wuCd().cd,
         repKm: n * 0.4,
-        wu: 3, cd: 2,
+        wu: wuCd().wu, cd: wuCd().cd,
         reps: { n, stepKm: 0.4, recS: 30, pace: p.hills, recLabel: "Rest" },
       };
     }
@@ -351,7 +353,7 @@
     }
     const recKm = (n - 1) * (s.recS / 420); // slow jog ≈ 7:00/km
     return {
-      type, title: s.name, detail, km: 2 + repKm + recKm + 1.5, repKm, wuNote: true, wu: 2, cd: 1.5,
+      type, title: s.name, detail, km: wuCd().wu + repKm + recKm + wuCd().cd, repKm, wuNote: true, wu: wuCd().wu, cd: wuCd().cd,
       reps: { n, stepKm: fmt === "time" ? null : s.distKm, stepMin: s.min, recS: s.recS, pace: pc, recLabel: "Jog" },
     };
   }
@@ -381,6 +383,12 @@
   }
   /** 18600 → "5.2h" for compact chart labels. */
   const fmtHours = (sec) => `${(sec / 3600).toFixed(1)}h`;
+
+  /** Sub-T warm-up and cool-down distances in km, from the Plan settings. */
+  function wuCd() {
+    const km = (v) => Math.max(0, Number(v) || 0);
+    return { wu: km(state.subtWarmupKm), cd: km(state.subtCooldownKm) };
+  }
 
   function buildPlan(m) {
     const p = m.paces;
@@ -464,6 +472,8 @@
     const warnEl = document.getElementById("plan-warnings");
     document.getElementById("vol-unit").textContent = unitDist() + " / week";
     document.getElementById("start-unit").textContent = unitDist() + " / week";
+    document.getElementById("wu-unit").textContent = unitDist();
+    document.getElementById("cd-unit").textContent = unitDist();
 
     if (!m) {
       summary.innerHTML = `Enter a valid PB on the <a href="#paces">Predicted Paces</a> tab first.`;
@@ -501,11 +511,16 @@
         const date = new Date(wk.weekStart);
         date.setDate(date.getDate() + i);
         const cls = d.type === "race" ? "race" : SESSION_TYPES[d.type]?.cls || "easy";
-        const kmTxt = d.km ? `${dist(d.km)}${d.wuNote ? " incl. WU/CD" : ""} · ~${fmtDuration(d.sec)}` : "";
+        const kmTxt = d.km ? `${dist(d.km)}${d.wu != null ? " total" : ""} · ~${fmtDuration(d.sec)}` : "";
+        const detailHtml = d.wu != null
+          ? (d.wu > 0 ? `<div class="seg seg-easy">Warm-up ${dist(d.wu)} easy${d.wuExtra || ""}</div>` : "") +
+            `<div class="seg seg-main">${d.main || d.detail}</div>` +
+            (d.cd > 0 ? `<div class="seg seg-easy">Cool-down ${dist(d.cd)} easy</div>` : "")
+          : d.detail;
         return `<div class="day ${cls}">
           <div class="day-name">${DAYS[i]} <span class="hint">${fmtShortDate(date)}</span></div>
           <div class="day-title">${d.title}</div>
-          <div class="day-detail">${d.detail}</div>
+          <div class="day-detail">${detailHtml}</div>
           ${kmTxt ? `<div class="day-dist">${kmTxt}</div>` : ""}
           ${d.type !== "rest" ? `<div class="day-actions"><button type="button" class="copy-btn" data-week="${wk.n - 1}" data-day="${i}" aria-label="Copy ${DAYS[i]} week ${wk.n} workout">Copy</button>${PUSH_ENABLED ? `<button type="button" class="copy-btn push-day" data-week="${wk.n - 1}" data-day="${i}" aria-label="Send ${DAYS[i]} week ${wk.n} workout to intervals.icu">Send</button>` : ""}</div>` : ""}
         </div>`;
@@ -888,7 +903,17 @@
     "final-week": "finalWeek",
   };
 
+  /** Warm-up / cool-down inputs show the display unit; state keeps km. */
+  const WUCD = { "subt-warmup": "subtWarmupKm", "subt-cooldown": "subtCooldownKm" };
+  function syncWuCdInputs() {
+    const f = state.units === "mi" ? 1 / KM_PER_MI : 1;
+    Object.entries(WUCD).forEach(([id, key]) => {
+      document.getElementById(id).value = Math.round(Number(state[key]) * f * 10) / 10;
+    });
+  }
+
   function syncInputs() {
+    syncWuCdInputs();
     Object.entries(FIELDS).forEach(([id, key]) => { document.getElementById(id).value = state[key]; });
     document.getElementById("deloads").checked = !!state.deloads;
     renderTemplate();
@@ -918,6 +943,8 @@
           state.startVolume = Math.round(Number(state.startVolume) * conv);
           document.getElementById("peak-volume").value = state.peakVolume;
           document.getElementById("start-volume").value = state.startVolume;
+          state.units = v;
+          syncWuCdInputs();
         }
         state[key] = v;
         save();
@@ -925,6 +952,15 @@
       };
       el.addEventListener("input", handler);
       el.addEventListener("change", handler);
+    });
+
+    Object.entries(WUCD).forEach(([id, key]) => {
+      document.getElementById(id).addEventListener("input", (e) => {
+        const v = Math.max(0, Number(e.target.value) || 0);
+        state[key] = state.units === "mi" ? v * KM_PER_MI : v;
+        save();
+        renderAll();
+      });
     });
 
     document.getElementById("deloads").addEventListener("change", (e) => {
