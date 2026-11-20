@@ -9,6 +9,7 @@
   const KM_PER_MI = 1.609344;
   const STORAGE_KEY = "nsm-planner-v1";
   const MIN_EASY_KM = 3;
+  const STRIDES = "6 × 20s strides";
   const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
   const RACES = [
@@ -141,6 +142,8 @@
 
   // ---------------------------------------------------------------- state
   let state = load();
+  let lastWeeks = [];
+  let lastPaces = null;
 
   function load() {
     try {
@@ -317,6 +320,9 @@
         type, title: what,
         detail: `Thorough warm-up with strides. Current PB pace ${pace(target.pace)} (${fmtTime(target.time)})`,
         km: raceKm + 5,
+        wu: 3, cd: 2, wuExtra: " + strides",
+        raceKm, racePace: target.pace,
+        main: `${what} @ current PB pace ${pace(target.pace)} (${fmtTime(target.time)})`,
       };
     }
 
@@ -327,6 +333,8 @@
         detail: `${n} × 400 m @ ${rangeOf(p.hills)} (${fmtTime(p.hills.lo * 0.4)}–${fmtTime(p.hills.hi * 0.4)}), 30s rest, or ${n} × 200 m hills, jog down`,
         km: 3 + n * 0.4 + (n - 1) * 0.08 + 2,
         repKm: n * 0.4,
+        wu: 3, cd: 2,
+        reps: { n, stepKm: 0.4, recS: 30, pace: p.hills, recLabel: "Rest" },
       };
     }
 
@@ -342,7 +350,10 @@
       repKm = n * s.distKm;
     }
     const recKm = (n - 1) * (s.recS / 420); // slow jog ≈ 7:00/km
-    return { type, title: s.name, detail, km: 2 + repKm + recKm + 1.5, repKm, wuNote: true };
+    return {
+      type, title: s.name, detail, km: 2 + repKm + recKm + 1.5, repKm, wuNote: true, wu: 2, cd: 1.5,
+      reps: { n, stepKm: fmt === "time" ? null : s.distKm, stepMin: s.min, recS: s.recS, pace: pc, recLabel: "Jog" },
+    };
   }
 
   function buildPlan(m) {
@@ -371,6 +382,14 @@
       // Size reps from the normal template so a race week tapers the remaining sessions.
       const wv = repCounts(state.template, targetKm, p, fmt);
       const days = tmpl.map((t) => buildSession(t, w, wv, p, fmt, raceKm));
+
+      // Strides on the first easy run of the week.
+      const firstEasy = days.find((d) => d.type === "easy");
+      if (firstEasy) {
+        firstEasy.title = "Easy + strides";
+        firstEasy.strides = STRIDES;
+        firstEasy.detail = `${rangeOf(p.easy)}, then ${STRIDES}`;
+      }
 
       const longRun = days.find((d) => d.type === "longrun");
       if (longRun) longRun.km = Math.min(Math.max(targetKm * 0.22, 8), 32);
@@ -428,6 +447,8 @@
     summary.innerHTML = `Using your <strong>${pbLabel} PB of ${fmtTime(m.pbSec)}</strong>. VDOT ${m.vdot.toFixed(1)}. Sub-T paces: short ${rangeOf(m.paces.short)} · medium ${rangeOf(m.paces.medium)} · long ${rangeOf(m.paces.long)}. <a href="#paces">Change</a>`;
 
     const weeks = buildPlan(m);
+    lastWeeks = weeks;
+    lastPaces = m.paces;
     const warns = templateWarnings();
     if (weeks.some((w) => w.tooLow)) {
       warns.push(`Your peak volume is too low for this template: some easy runs were raised to the ${dist(MIN_EASY_KM)} minimum, so weekly totals are above target. Raise the volume or swap an easy day for rest.`);
@@ -446,6 +467,7 @@
       return ` <span class="hint">(${pct > 0 ? "+" : ""}${pct}% vs last full week)</span>`;
     };
     renderVolumeSummary(weeks);
+    renderVolumeChart(weeks);
     planEl.innerHTML = weeks.map((wk) => {
       const days = wk.days.map((d, i) => {
         const date = new Date(wk.weekStart);
@@ -457,11 +479,12 @@
           <div class="day-title">${d.title}</div>
           <div class="day-detail">${d.detail}</div>
           ${kmTxt ? `<div class="day-dist">${kmTxt}</div>` : ""}
+          ${d.type !== "rest" ? `<div class="day-actions"><button type="button" class="copy-btn" data-week="${wk.n - 1}" data-day="${i}" aria-label="Copy ${DAYS[i]} week ${wk.n} workout">Copy</button>${PUSH_ENABLED ? `<button type="button" class="copy-btn push-day" data-week="${wk.n - 1}" data-day="${i}" aria-label="Send ${DAYS[i]} week ${wk.n} workout to intervals.icu">Send</button>` : ""}</div>` : ""}
         </div>`;
       }).join("");
       return `<article class="week">
         <div class="week-head">
-          <h3>Week ${wk.n} <span class="hint">· ${fmtShortDate(wk.weekStart)}</span></h3>
+          <h3>Week ${wk.n} <span class="hint">· ${fmtShortDate(wk.weekStart)}</span>${PUSH_ENABLED ? ` <button type="button" class="copy-btn push-week" data-week="${wk.n - 1}">Send week</button>` : ""}</h3>
           <div class="week-meta">
             <span class="pill phase">${wk.phase}</span>
             ${wk.deload ? `<span class="pill phase">Lighter week</span>` : ""}
@@ -484,6 +507,287 @@
       : `reaches ${dist(Math.max(...vp.weeks.filter((w) => !w.deload && !w.taper).map((w) => w.km)), 0)} by week 11 (peak of ${dist(vp.peakKm, 0)} not reached at 5% a week)`;
     el.innerHTML = `Starts at <strong>${dist(vp.startKm, 0)}</strong> and ${reach}. ` +
       `Planned weeks: ${vp.weeks.map((w) => dist(w.km, 0).split(" ")[0]).join(" · ")} ${unitDist()}.`;
+  }
+
+  /** Plain-text version of one day's workout, for pasting into a Strava description. */
+  function workoutText(wk, d) {
+    const name = d.type === "easy" ? (d.strides ? "Easy run + strides" : "Easy run") : d.title;
+    const head = `${name} – Week ${wk.n} (${wk.phase})`;
+    if (d.type === "easy" || d.type === "longrun") {
+      const lines = [head, `${dist(d.km)} easy @ ${rangeOf(lastPaces.easy)}`];
+      if (d.strides) lines.push(`Finish with ${d.strides}, fast but relaxed, full recovery between`);
+      return lines.join("\n");
+    }
+    const lines = [head];
+    if (d.wu) lines.push(`Warm-up: ${dist(d.wu)} easy${d.wuExtra || ""}`);
+    lines.push(d.main || d.detail);
+    if (d.cd) lines.push(`Cool-down: ${dist(d.cd)} easy`);
+    lines.push(`Total: ${dist(d.km)}`);
+    return lines.join("\n");
+  }
+
+  // ---------------------------------------------------------------- intervals.icu
+  // Set to false by the single-file build, whose sandbox cannot reach other sites.
+  const PUSH_ENABLED = true;
+  const ICU_BASE = "https://intervals.icu/api/v1/athlete/";
+  let icuKeyMemory = "";
+
+  function icuKey() {
+    if (icuKeyMemory) return icuKeyMemory;
+    try { return localStorage.getItem("nsm-icu-key") || ""; } catch (e) { return ""; }
+  }
+  function setIcuKey(key, remember) {
+    icuKeyMemory = key;
+    try {
+      if (remember && key) localStorage.setItem("nsm-icu-key", key);
+      else localStorage.removeItem("nsm-icu-key");
+    } catch (e) { /* ignore */ }
+  }
+
+  /** "4:12/km" style pace for the intervals.icu workout builder. */
+  function icuPace(secPerKm) {
+    const mi = state.units === "mi";
+    return `${fmtTime(mi ? secPerKm * KM_PER_MI : secPerKm)}/${mi ? "mi" : "km"}`;
+  }
+  const icuRange = (r) => `${icuPace(r.lo)}-${icuPace(r.hi)} Pace`;
+  const icuKm = (km) => `${Math.round(km * 10) / 10}km`;
+
+  /** Workout text in intervals.icu workout-builder syntax. */
+  function icuDescription(wk, d) {
+    const easy = icuRange(lastPaces.easy);
+    const out = [`Norwegian Singles · Week ${wk.n} (${wk.phase})`, ""];
+    if (d.type === "easy" || d.type === "longrun") {
+      out.push(`- ${d.type === "longrun" ? "Long run" : "Easy"} ${icuKm(d.km)} ${easy}`);
+      if (d.strides) {
+        const fast = lastPaces.hills.lo - 15;
+        out.push("", "Strides 6x", `- Stride 20s ${icuPace(fast)} Pace`, `- Walk/jog 60s ${easy}`, "");
+      }
+      return out.join("\n");
+    }
+    if (d.wu) out.push(`- Warmup ${icuKm(d.wu)} ${easy}`, "");
+    if (d.type === "race") {
+      out.push(`- ${d.title} ${icuKm(d.raceKm)} ${icuPace(d.racePace)} Pace`, "");
+    } else if (d.reps) {
+      const r = d.reps;
+      const step = r.stepKm ? (r.stepKm < 1 ? `${Math.round(r.stepKm * 1000)}mtr` : `${r.stepKm}km`) : `${r.stepMin}m`;
+      out.push(`Main Set ${r.n}x`, `- ${step} ${icuRange(r.pace)}`, `- ${r.recLabel} ${r.recS}s ${easy}`, "");
+    }
+    if (d.cd) out.push(`- Cooldown ${icuKm(d.cd)} ${easy}`);
+    return out.join("\n");
+  }
+
+  function icuEvent(wk, d, i) {
+    const date = new Date(wk.weekStart);
+    date.setDate(date.getDate() + i);
+    const day = isoDate(date);
+    return {
+      category: "WORKOUT",
+      type: "Run",
+      start_date_local: `${day}T00:00:00`,
+      name: d.title,
+      description: icuDescription(wk, d),
+      external_id: `nsm-${day}`,
+    };
+  }
+
+  /** Replaces this planner's workouts on the given dates, then creates them. */
+  async function icuPush(events) {
+    const key = icuKey();
+    if (!key) throw new Error("Add your intervals.icu API key in Plan settings first.");
+    const athlete = encodeURIComponent((state.icuAthlete || "").trim() || "0");
+    const headers = {
+      Authorization: "Basic " + btoa("API_KEY:" + key),
+      "Content-Type": "application/json",
+    };
+    const call = async (path, method, body) => {
+      let res;
+      try {
+        res = await fetch(ICU_BASE + athlete + path, { method, headers, body: JSON.stringify(body) });
+      } catch (e) {
+        throw new Error("Couldn't reach intervals.icu. Check your connection and try again.");
+      }
+      if (res.status === 401 || res.status === 403) throw new Error("intervals.icu rejected the API key or athlete ID. Check them in Plan settings.");
+      if (!res.ok) throw new Error(`intervals.icu returned an error (${res.status}).`);
+      return res;
+    };
+    await call("/events/bulk-delete", "PUT", events.map((e) => ({ external_id: e.external_id })));
+    await call("/events/bulk", "POST", events);
+    return events.length;
+  }
+
+  function pushStatus(text, isError) {
+    const el = document.getElementById("push-msg");
+    if (!el) return;
+    el.textContent = text;
+    el.classList.toggle("error", !!isError);
+  }
+
+  async function runPush(btn, events, label) {
+    if (!events.length) return;
+    const original = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "Sending…";
+    try {
+      const n = await icuPush(events);
+      btn.textContent = "Sent";
+      btn.classList.add("done");
+      pushStatus(`Sent ${n} workout${n === 1 ? "" : "s"} (${label}) to intervals.icu.`);
+    } catch (e) {
+      btn.textContent = "Failed";
+      pushStatus(e.message, true);
+    } finally {
+      setTimeout(() => { btn.textContent = original; btn.disabled = false; btn.classList.remove("done"); }, 2000);
+    }
+  }
+
+  const weekEvents = (wk) => wk.days.map((d, i) => (d.type === "rest" ? null : icuEvent(wk, d, i))).filter(Boolean);
+
+  /** Copies text inside a click handler; falls back to a hidden textarea. */
+  function copyText(text) {
+    const fallback = () => {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      let ok = false;
+      try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+      ta.remove();
+      return Promise.resolve(ok);
+    };
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        return navigator.clipboard.writeText(text).then(() => true, fallback);
+      }
+    } catch (e) { /* fall through */ }
+    return fallback();
+  }
+
+  // ---------------------------------------------------------------- volume chart
+  const SVG_NS = "http://www.w3.org/2000/svg";
+  function niceStep(range, ticks) {
+    const raw = range / ticks;
+    const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+    const n = raw / mag;
+    return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10) * mag;
+  }
+  /** Bar with 4px rounded top corners anchored to the baseline. */
+  function barPath(x, y, w, h) {
+    const r = Math.min(4, w / 2, h);
+    return `M${x},${y + h}V${y + r}Q${x},${y} ${x + r},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h}Z`;
+  }
+
+  /** Phase colour key for week index i: base, build, peak or trial. */
+  function phaseKey(i) {
+    if (i < 4) return "base";
+    if (i < 8) return "build";
+    if (i === 11 && (state.finalWeek === "race" || state.finalWeek === "test")) return "trial";
+    return "peak";
+  }
+
+  function renderVolumeChart(weeks) {
+    const host = document.getElementById("volume-chart");
+    if (!host) return;
+    const trialLegend = document.getElementById("legend-trial");
+    if (trialLegend) trialLegend.hidden = phaseKey(11) !== "trial";
+    const toUnit = (km) => (state.units === "mi" ? km / KM_PER_MI : km);
+    const W = Math.max(host.clientWidth || 0, 300);
+    const H = 230;
+    const M = { top: 20, right: 8, bottom: 26, left: 38 };
+    const pw = W - M.left - M.right;
+    const ph = H - M.top - M.bottom;
+
+    const vals = weeks.map((w) => toUnit(w.totalKm));
+    const peak = toUnit(weeks.volume.peakKm);
+    const step = niceStep(Math.max(...vals, peak) * 1.08, 4);
+    const yMax = Math.ceil((Math.max(...vals, peak) * 1.08) / step) * step;
+    const y = (v) => M.top + ph - (v / yMax) * ph;
+    const band = pw / weeks.length;
+    const gap = Math.max(2, band * 0.28);
+    const bw = band - gap;
+
+    const full = (i) => !weeks[i].deload && !weeks.volume.weeks[i].taper;
+    const peakIdx = vals.indexOf(Math.max(...vals));
+    // Label first, highest and last bars; skip the highest when the peak line already names it.
+    const labelled = new Set([0, weeks.length - 1]);
+    if (Math.abs(vals[peakIdx] - peak) >= 1) labelled.add(peakIdx);
+
+    let svg = `<svg xmlns="${SVG_NS}" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Weekly volume for weeks 1 to 12: ${vals.map((v) => Math.round(v)).join(", ")} ${unitDist()}">`;
+    svg += `<defs><pattern id="hatch-lighter" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)"><line class="hatch-line" x1="0" y1="0" x2="0" y2="6"/></pattern></defs>`;
+    // grid + y labels
+    for (let v = 0; v <= yMax + 1e-9; v += step) {
+      const yy = Math.round(y(v)) + 0.5;
+      svg += `<line class="grid" x1="${M.left}" x2="${W - M.right}" y1="${yy}" y2="${yy}"/>`;
+      svg += `<text class="axis" x="${M.left - 6}" y="${yy + 4}" text-anchor="end">${Math.round(v)}</text>`;
+    }
+    // peak target
+    const py = Math.round(y(peak)) + 0.5;
+    svg += `<line class="peak-line" x1="${M.left}" x2="${W - M.right}" y1="${py}" y2="${py}"/>`;
+    svg += `<text class="peak-label" x="${M.left + 4}" y="${py - 5}" text-anchor="start">Peak ${Math.round(peak)} ${unitDist()}</text>`;
+    // bars
+    weeks.forEach((wk, i) => {
+      const x = M.left + i * band + gap / 2;
+      const top = y(vals[i]);
+      const h = M.top + ph - top;
+      svg += `<rect class="hover-col" data-i="${i}" x="${M.left + i * band}" y="${M.top}" width="${band}" height="${ph}"/>`;
+      const d = barPath(x, top, bw, h);
+      svg += `<path class="bar ph-${phaseKey(i)}" d="${d}"/>`;
+      if (wk.deload) svg += `<path class="bar-hatch" d="${d}" fill="url(#hatch-lighter)"/>`;
+      if (labelled.has(i)) {
+        svg += `<text class="bar-label" x="${x + bw / 2}" y="${top - 5}" text-anchor="middle">${Math.round(vals[i])}</text>`;
+      }
+      svg += `<text class="axis" x="${x + bw / 2}" y="${H - 8}" text-anchor="middle">${band < 30 ? i + 1 : "W" + (i + 1)}</text>`;
+    });
+    // hit targets on top (full column height)
+    weeks.forEach((wk, i) => {
+      svg += `<rect class="hit" tabindex="0" data-i="${i}" x="${M.left + i * band}" y="${M.top}" width="${band}" height="${ph + M.bottom}" aria-label="Week ${i + 1}: ${Math.round(vals[i])} ${unitDist()}"/>`;
+    });
+    svg += `</svg><div class="chart-tip" hidden></div>`;
+    host.innerHTML = svg;
+
+    // 12-week totals below the chart.
+    const total = weeks.reduce((t, w) => t + w.totalKm, 0);
+    const subt = weeks.reduce((t, w) => t + w.subtKm, 0);
+    const totalEl = document.getElementById("volume-total");
+    if (totalEl) {
+      totalEl.innerHTML =
+        `<div class="stat"><span class="stat-label">12-week total</span><span class="stat-value">${dist(total, 0)}</span></div>` +
+        `<div class="stat"><span class="stat-label">Weekly average</span><span class="stat-value">${dist(total / weeks.length, 0)}</span></div>` +
+        `<div class="stat"><span class="stat-label">Sub-T reps</span><span class="stat-value">${dist(subt, 0)} <small>(${Math.round(subt / total * 100)}%)</small></span></div>`;
+    }
+
+    const tip = host.querySelector(".chart-tip");
+    const cols = host.querySelectorAll(".hover-col");
+    const show = (i, evt) => {
+      const wk = weeks[i];
+      const prevFull = weeks.slice(0, i).map((_, j) => j).reverse().find(full);
+      let change = "";
+      if (full(i) && prevFull != null) {
+        const pct = Math.round((wk.targetKm / weeks[prevFull].targetKm - 1) * 100);
+        change = `${pct > 0 ? "+" : ""}${pct}% vs last full week`;
+      } else if (wk.deload) change = "Lighter week";
+      else if (weeks.volume.weeks[i].taper) change = state.finalWeek === "race" ? "Taper + race" : "Time trial week";
+      tip.innerHTML = `<i class="sw ph-${phaseKey(i)}"></i> <strong>Week ${wk.n}</strong> · ${wk.phase}<br>` +
+        `<span class="tip-val">${dist(wk.totalKm, 0)}</span>${change ? ` · ${change}` : ""}<br>` +
+        `Sub-T ${dist(wk.subtKm, 0)}`;
+      tip.hidden = false;
+      cols.forEach((c) => c.classList.toggle("on", Number(c.dataset.i) === i));
+      const colX = M.left + (i + 0.5) * band;
+      const tw = tip.offsetWidth;
+      let left = colX - tw / 2;
+      left = Math.max(0, Math.min(W - tw, left));
+      tip.style.left = `${left}px`;
+      tip.style.top = `${Math.max(0, y(vals[i]) - tip.offsetHeight - 10)}px`;
+    };
+    const hide = () => { tip.hidden = true; cols.forEach((c) => c.classList.remove("on")); };
+    host.querySelectorAll(".hit").forEach((r) => {
+      const i = Number(r.dataset.i);
+      r.addEventListener("pointerenter", () => show(i));
+      r.addEventListener("focus", () => show(i));
+      r.addEventListener("pointerleave", hide);
+      r.addEventListener("blur", hide);
+    });
   }
 
   function renderTemplate() {
@@ -550,6 +854,7 @@
     document.getElementById("tab-builder").setAttribute("aria-selected", String(isBuilder));
     document.getElementById("panel-paces").hidden = isBuilder;
     document.getElementById("panel-builder").hidden = !isBuilder;
+    if (isBuilder && lastWeeks.length) renderVolumeChart(lastWeeks);
   }
 
   function init() {
@@ -589,6 +894,49 @@
 
     document.getElementById("btn-print").addEventListener("click", () => window.print());
     document.getElementById("btn-csv").addEventListener("click", exportCSV);
+
+    const icuSection = document.getElementById("icu-settings");
+    const pushAll = document.getElementById("btn-push-all");
+    if (!PUSH_ENABLED) {
+      if (icuSection) icuSection.hidden = true;
+      if (pushAll) pushAll.hidden = true;
+    } else {
+      const keyEl = document.getElementById("icu-key");
+      const rememberEl = document.getElementById("icu-remember");
+      const athleteEl = document.getElementById("icu-athlete");
+      keyEl.value = icuKey();
+      rememberEl.checked = !!keyEl.value;
+      athleteEl.value = state.icuAthlete || "";
+      const updateKey = () => setIcuKey(keyEl.value.trim(), rememberEl.checked);
+      keyEl.addEventListener("input", updateKey);
+      rememberEl.addEventListener("change", updateKey);
+      athleteEl.addEventListener("input", () => { state.icuAthlete = athleteEl.value.trim(); save(); });
+      pushAll.addEventListener("click", () => runPush(pushAll, lastWeeks.flatMap(weekEvents), "all 12 weeks"));
+    }
+
+    document.getElementById("plan").addEventListener("click", (e) => {
+      const btn = e.target.closest(".copy-btn");
+      if (!btn) return;
+      if (btn.classList.contains("push-week")) {
+        const wk = lastWeeks[Number(btn.dataset.week)];
+        if (wk) runPush(btn, weekEvents(wk), `week ${wk.n}`);
+        return;
+      }
+      if (btn.classList.contains("push-day")) {
+        const wk = lastWeeks[Number(btn.dataset.week)];
+        const i = Number(btn.dataset.day);
+        if (wk && wk.days[i]) runPush(btn, [icuEvent(wk, wk.days[i], i)], `week ${wk.n} ${DAYS[i]}`);
+        return;
+      }
+      const wk = lastWeeks[Number(btn.dataset.week)];
+      const d = wk && wk.days[Number(btn.dataset.day)];
+      if (!d) return;
+      copyText(workoutText(wk, d)).then((ok) => {
+        btn.textContent = ok ? "Copied" : "Copy failed";
+        btn.classList.toggle("done", ok);
+        setTimeout(() => { btn.textContent = "Copy"; btn.classList.remove("done"); }, 1600);
+      });
+    });
     document.getElementById("btn-reset").addEventListener("click", () => {
       const keep = { pbDistance: state.pbDistance, pbTime: state.pbTime, units: state.units };
       state = Object.assign({}, DEFAULTS, keep, { template: DEFAULTS.template.slice(), startDate: nextMonday() });
@@ -600,6 +948,11 @@
     document.getElementById("tab-paces").addEventListener("click", () => { location.hash = "paces"; showTab("paces"); });
     document.getElementById("tab-builder").addEventListener("click", () => { location.hash = "builder"; showTab("builder"); });
     window.addEventListener("hashchange", () => showTab(location.hash.slice(1)));
+    let resizeTimer;
+    window.addEventListener("resize", () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => { if (lastWeeks.length) renderVolumeChart(lastWeeks); }, 120);
+    });
     showTab(location.hash.slice(1));
 
     renderAll();

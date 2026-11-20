@@ -111,12 +111,44 @@
         <h3>Weekly template</h3>
         <div class="week-template" id="week-template"></div>
         <p class="note">Classic layout: 2–3 sub-threshold days with an easy day between each, plus one long easy run. Most of your weekly volume should be easy running.</p>
+
+        <div id="icu-settings">
+          <h3>Send to intervals.icu</h3>
+          <div class="form-grid">
+            <label>API key <span class="hint">intervals.icu → Settings → Developer</span>
+              <input id="icu-key" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your API key" />
+            </label>
+            <label>Athlete ID <span class="hint">optional, e.g. i12345</span>
+              <input id="icu-athlete" type="text" autocomplete="off" spellcheck="false" placeholder="Your own account" />
+            </label>
+            <label class="check"><input id="icu-remember" type="checkbox" /> Remember key on this device</label>
+          </div>
+          <p class="note">Workouts are sent with pace targets, then sync from intervals.icu to your watch (COROS, Garmin and others) if you've connected it there. Sending a day again replaces that day's planner workout instead of adding a duplicate. Your key is only sent to intervals.icu. If you don't tick "Remember", it's forgotten when you close the page.</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="chart-head">
+          <h2>Weekly volume</h2>
+          <div class="legend" aria-hidden="true">
+            <span><i class="sw ph-base"></i>Base</span>
+            <span><i class="sw ph-build"></i>Build</span>
+            <span><i class="sw ph-peak"></i>Peak</span>
+            <span id="legend-trial"><i class="sw ph-trial"></i>Race / trial</span>
+            <span><i class="sw sw-hatch"></i>Lighter week</span>
+            <span><i class="sw sw-peak"></i>Peak target</span>
+          </div>
+        </div>
+        <div id="volume-chart" class="chart"></div>
+        <div id="volume-total" class="volume-total"></div>
       </div>
 
       <div class="toolbar">
         <button id="btn-print" class="btn">Print</button>
         <button id="btn-csv" class="btn">Download CSV</button>
+        <button id="btn-push-all" class="btn">Send all to intervals.icu</button>
         <button id="btn-reset" class="btn btn-ghost">Reset to defaults</button>
+        <span id="push-msg" class="push-msg" role="status"></span>
       </div>
 
       <div id="plan-warnings"></div>
