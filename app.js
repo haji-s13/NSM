@@ -472,8 +472,12 @@
     const warnEl = document.getElementById("plan-warnings");
     document.getElementById("vol-unit").textContent = unitDist() + " / week";
     document.getElementById("start-unit").textContent = unitDist() + " / week";
-    document.getElementById("wu-unit").textContent = unitDist();
-    document.getElementById("cd-unit").textContent = unitDist();
+    document.getElementById("wu-unit").textContent = unitDist() + " · sub-T days";
+    document.getElementById("cd-unit").textContent = unitDist() + " · sub-T days";
+    const wc = wuCd();
+    document.getElementById("settings-summary").textContent =
+      `${dist(volumePlan().startKm, 0)} → ${dist(volumePlan().peakKm, 0)} · ${Number(state.subtShare) || 25}% sub-T · ` +
+      `warm-up ${dist(wc.wu)} · cool-down ${dist(wc.cd)}`;
 
     if (!m) {
       summary.innerHTML = `Enter a valid PB on the <a href="#paces">Predicted Paces</a> tab first.`;
@@ -961,6 +965,13 @@
         save();
         renderAll();
       });
+    });
+
+    // Remember whether Plan settings is collapsed (per device; harmless if storage is blocked).
+    const settingsEl = document.getElementById("plan-settings");
+    try { if (localStorage.getItem("nsm-settings-collapsed") === "1") settingsEl.open = false; } catch (e) { /* ignore */ }
+    settingsEl.addEventListener("toggle", () => {
+      try { localStorage.setItem("nsm-settings-collapsed", settingsEl.open ? "0" : "1"); } catch (e) { /* ignore */ }
     });
 
     document.getElementById("deloads").addEventListener("change", (e) => {
