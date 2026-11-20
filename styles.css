@@ -15,6 +15,10 @@
   --long-ink: #1f3a68;
   --rest: #f0f1f3;
   --race: #fbe3e1;
+  --bar-full: #256abf;
+  --bar-light: #6da7ec;
+  --grid: #e6e8ec;
+  --hover-col: rgba(37, 106, 191, 0.08);
   --radius: 10px;
 }
 
@@ -36,6 +40,10 @@
     --long-ink: #a9c4ee;
     --rest: #22262c;
     --race: #3d2220;
+    --bar-full: #5294e6;
+    --bar-light: #2160ae;
+    --grid: #2a3038;
+    --hover-col: rgba(82, 148, 230, 0.12);
   }
 }
 
@@ -168,6 +176,36 @@ table.data tr.pb-row td { font-weight: 700; }
 .copy-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .copy-btn.done { background: var(--accent); border-color: var(--accent); color: #fff; }
 @media (max-width: 760px) { .copy-btn { grid-column: 2; justify-self: start; } }
+
+/* Weekly volume chart */
+.chart-head { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 6px 16px; margin-bottom: 8px; }
+.chart-head h2 { margin: 0; }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: .8rem; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; }
+.sw-full { background: var(--bar-full); }
+.sw-light { background: var(--bar-light); }
+.sw-peak { height: 0; border-top: 2px dashed var(--muted); border-radius: 0; width: 16px; }
+.chart { position: relative; width: 100%; min-width: 0; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart .grid { stroke: var(--grid); stroke-width: 1; }
+.chart .axis { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.chart .bar-label { fill: var(--text); font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.chart .peak-line { stroke: var(--muted); stroke-width: 1.5; stroke-dasharray: 5 4; }
+.chart .peak-label { fill: var(--muted); font-size: 11px; font-weight: 600; }
+.chart .bar-full { fill: var(--bar-full); }
+.chart .bar-light { fill: var(--bar-light); }
+.chart .hover-col { fill: transparent; }
+.chart .hover-col.on { fill: var(--hover-col); }
+.chart .hit { fill: transparent; cursor: default; outline: none; }
+.chart .hit:focus-visible { stroke: var(--accent); stroke-width: 2; }
+.chart-tip {
+  position: absolute; pointer-events: none; z-index: 2;
+  background: var(--surface); color: var(--text); border: 1px solid var(--border);
+  border-radius: 8px; padding: 6px 10px; font-size: .8rem; line-height: 1.4;
+  box-shadow: 0 4px 14px rgba(0,0,0,.12); white-space: nowrap;
+}
+.chart-tip .tip-val { font-weight: 700; font-variant-numeric: tabular-nums; }
 
 .site-footer { color: var(--muted); font-size: .8rem; padding-bottom: 24px; }
 

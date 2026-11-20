@@ -17,6 +17,7 @@ A static web app (plain HTML, CSS and JavaScript, no build step) with two tabs:
    - Optional lighter weeks in weeks 4 and 8
    - Week 12 as a taper and race, a time trial, or a normal week
    - Easy-run distances calculated to fill the weekly volume target
+   - A weekly volume bar chart (build vs lighter/race weeks, peak target line, hover for details)
    - A Copy button on each day that copies a plain-text workout for a Strava description
    - Print and CSV export
 

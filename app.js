@@ -453,6 +453,7 @@
       return ` <span class="hint">(${pct > 0 ? "+" : ""}${pct}% vs last full week)</span>`;
     };
     renderVolumeSummary(weeks);
+    renderVolumeChart(weeks);
     planEl.innerHTML = weeks.map((wk) => {
       const days = wk.days.map((d, i) => {
         const date = new Date(wk.weekStart);
@@ -531,6 +532,108 @@
     return fallback();
   }
 
+  // ---------------------------------------------------------------- volume chart
+  const SVG_NS = "http://www.w3.org/2000/svg";
+  function niceStep(range, ticks) {
+    const raw = range / ticks;
+    const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+    const n = raw / mag;
+    return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10) * mag;
+  }
+  /** Bar with 4px rounded top corners anchored to the baseline. */
+  function barPath(x, y, w, h) {
+    const r = Math.min(4, w / 2, h);
+    return `M${x},${y + h}V${y + r}Q${x},${y} ${x + r},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h}Z`;
+  }
+
+  function renderVolumeChart(weeks) {
+    const host = document.getElementById("volume-chart");
+    if (!host) return;
+    const toUnit = (km) => (state.units === "mi" ? km / KM_PER_MI : km);
+    const W = Math.max(host.clientWidth || 0, 300);
+    const H = 230;
+    const M = { top: 20, right: 8, bottom: 26, left: 38 };
+    const pw = W - M.left - M.right;
+    const ph = H - M.top - M.bottom;
+
+    const vals = weeks.map((w) => toUnit(w.totalKm));
+    const peak = toUnit(weeks.volume.peakKm);
+    const step = niceStep(Math.max(...vals, peak) * 1.08, 4);
+    const yMax = Math.ceil((Math.max(...vals, peak) * 1.08) / step) * step;
+    const y = (v) => M.top + ph - (v / yMax) * ph;
+    const band = pw / weeks.length;
+    const gap = Math.max(2, band * 0.28);
+    const bw = band - gap;
+
+    const full = (i) => !weeks[i].deload && !weeks.volume.weeks[i].taper;
+    const peakIdx = vals.indexOf(Math.max(...vals));
+    // Label first, highest and last bars; skip the highest when the peak line already names it.
+    const labelled = new Set([0, weeks.length - 1]);
+    if (Math.abs(vals[peakIdx] - peak) >= 1) labelled.add(peakIdx);
+
+    let svg = `<svg xmlns="${SVG_NS}" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Weekly volume for weeks 1 to 12: ${vals.map((v) => Math.round(v)).join(", ")} ${unitDist()}">`;
+    // grid + y labels
+    for (let v = 0; v <= yMax + 1e-9; v += step) {
+      const yy = Math.round(y(v)) + 0.5;
+      svg += `<line class="grid" x1="${M.left}" x2="${W - M.right}" y1="${yy}" y2="${yy}"/>`;
+      svg += `<text class="axis" x="${M.left - 6}" y="${yy + 4}" text-anchor="end">${Math.round(v)}</text>`;
+    }
+    // peak target
+    const py = Math.round(y(peak)) + 0.5;
+    svg += `<line class="peak-line" x1="${M.left}" x2="${W - M.right}" y1="${py}" y2="${py}"/>`;
+    svg += `<text class="peak-label" x="${M.left + 4}" y="${py - 5}" text-anchor="start">Peak ${Math.round(peak)} ${unitDist()}</text>`;
+    // bars
+    weeks.forEach((wk, i) => {
+      const x = M.left + i * band + gap / 2;
+      const top = y(vals[i]);
+      const h = M.top + ph - top;
+      svg += `<rect class="hover-col" data-i="${i}" x="${M.left + i * band}" y="${M.top}" width="${band}" height="${ph}"/>`;
+      svg += `<path class="bar ${full(i) ? "bar-full" : "bar-light"}" d="${barPath(x, top, bw, h)}"/>`;
+      if (labelled.has(i)) {
+        svg += `<text class="bar-label" x="${x + bw / 2}" y="${top - 5}" text-anchor="middle">${Math.round(vals[i])}</text>`;
+      }
+      svg += `<text class="axis" x="${x + bw / 2}" y="${H - 8}" text-anchor="middle">${band < 30 ? i + 1 : "W" + (i + 1)}</text>`;
+    });
+    // hit targets on top (full column height)
+    weeks.forEach((wk, i) => {
+      svg += `<rect class="hit" tabindex="0" data-i="${i}" x="${M.left + i * band}" y="${M.top}" width="${band}" height="${ph + M.bottom}" aria-label="Week ${i + 1}: ${Math.round(vals[i])} ${unitDist()}"/>`;
+    });
+    svg += `</svg><div class="chart-tip" hidden></div>`;
+    host.innerHTML = svg;
+
+    const tip = host.querySelector(".chart-tip");
+    const cols = host.querySelectorAll(".hover-col");
+    const show = (i, evt) => {
+      const wk = weeks[i];
+      const prevFull = weeks.slice(0, i).map((_, j) => j).reverse().find(full);
+      let change = "";
+      if (full(i) && prevFull != null) {
+        const pct = Math.round((wk.targetKm / weeks[prevFull].targetKm - 1) * 100);
+        change = `${pct > 0 ? "+" : ""}${pct}% vs last full week`;
+      } else if (wk.deload) change = "Lighter week";
+      else if (weeks.volume.weeks[i].taper) change = state.finalWeek === "race" ? "Taper + race" : "Time trial week";
+      tip.innerHTML = `<strong>Week ${wk.n}</strong> · ${wk.phase}<br>` +
+        `<span class="tip-val">${dist(wk.totalKm, 0)}</span>${change ? ` · ${change}` : ""}<br>` +
+        `Sub-T ${dist(wk.subtKm, 0)}`;
+      tip.hidden = false;
+      cols.forEach((c) => c.classList.toggle("on", Number(c.dataset.i) === i));
+      const colX = M.left + (i + 0.5) * band;
+      const tw = tip.offsetWidth;
+      let left = colX - tw / 2;
+      left = Math.max(0, Math.min(W - tw, left));
+      tip.style.left = `${left}px`;
+      tip.style.top = `${Math.max(0, y(vals[i]) - tip.offsetHeight - 10)}px`;
+    };
+    const hide = () => { tip.hidden = true; cols.forEach((c) => c.classList.remove("on")); };
+    host.querySelectorAll(".hit").forEach((r) => {
+      const i = Number(r.dataset.i);
+      r.addEventListener("pointerenter", () => show(i));
+      r.addEventListener("focus", () => show(i));
+      r.addEventListener("pointerleave", hide);
+      r.addEventListener("blur", hide);
+    });
+  }
+
   function renderTemplate() {
     const el = document.getElementById("week-template");
     el.innerHTML = DAYS.map((d, i) => {
@@ -595,6 +698,7 @@
     document.getElementById("tab-builder").setAttribute("aria-selected", String(isBuilder));
     document.getElementById("panel-paces").hidden = isBuilder;
     document.getElementById("panel-builder").hidden = !isBuilder;
+    if (isBuilder && lastWeeks.length) renderVolumeChart(lastWeeks);
   }
 
   function init() {
@@ -658,6 +762,11 @@
     document.getElementById("tab-paces").addEventListener("click", () => { location.hash = "paces"; showTab("paces"); });
     document.getElementById("tab-builder").addEventListener("click", () => { location.hash = "builder"; showTab("builder"); });
     window.addEventListener("hashchange", () => showTab(location.hash.slice(1)));
+    let resizeTimer;
+    window.addEventListener("resize", () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => { if (lastWeeks.length) renderVolumeChart(lastWeeks); }, 120);
+    });
     showTab(location.hash.slice(1));
 
     renderAll();
