@@ -2,12 +2,13 @@
 
 A static web app (plain HTML, CSS and JavaScript, no build step) with two tabs:
 
-1. **Predicted Paces** – enter a 5k or 10k PB to get predicted race times (Riegel's formula, exponent 1.06) and training paces:
-   - Sub-T short (1k / 3 min reps): ≈ 15k pace
-   - Sub-T medium (2k / 6 min reps): ≈ half marathon pace
-   - Sub-T long (3k / 10 min reps): ≈ 30k pace
-   - 400s / hills: ≈ 10k pace
-   - Easy and long runs: marathon pace + 12–25%
+1. **Predicted Paces** – enter a 5k or 10k PB to get their VDOT, predicted race times (Jack Daniels' VDOT formula) and training paces, each shown as a range:
+   - Sub-T short (1k / 3 min reps): 15k → half marathon pace
+   - Sub-T medium (2k / 6 min reps): half marathon → 25k pace
+   - Sub-T long (3k / 10 min reps): 25k → 30k pace
+   - 400s / hills: 10k → 15k pace
+   - Easy and long runs: Daniels E (62–74% VDOT)
+   - Reference rows: Daniels T (83–88% VDOT) and marathon pace
    - An optional ± sec/km adjustment applies to all sub-T paces.
 2. **12-Week Builder** – choose a start date, peak weekly volume, rep format and a weekly template (which day gets which session). It generates 12 weeks with:
    - Base (weeks 1–4), Build (5–8) and Peak (9–11) phases, with rep counts that progress each week
