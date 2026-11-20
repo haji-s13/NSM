@@ -17,8 +17,9 @@ A static web app (plain HTML, CSS and JavaScript, no build step) with three tabs
    - Optional lighter weeks in weeks 4 and 8
    - Week 12 as a taper and race, a time trial, or a normal week
    - Easy-run distances calculated to fill the weekly volume target
+   - Estimated time for each workout and week (warm-up, reps, recoveries and cool-down at their paces)
    - 6 × 20s strides added to the first easy run of each week
-   - A weekly volume bar chart coloured by phase (base, build, peak, race/trial), lighter weeks hatched, peak target line, hover for details, and 12-week total, weekly average and sub-T totals below it
+   - A weekly volume bar chart coloured by phase (base, build, peak, race/trial), lighter weeks hatched, peak target line, hover for details, estimated hours per week under each bar, and 12-week total, weekly average, average weekly time and sub-T totals below it
    - Send buttons (per day, per week, or all 12 weeks) that push workouts with pace targets to intervals.icu using the API key from the intervals.icu tab, from where they sync to COROS, Garmin and other watches. This needs the hosted version (GitHub Pages or a local server), not the single-file preview.
    - A Copy button on each day that copies a plain-text workout for a Strava description
    - Print and CSV export
