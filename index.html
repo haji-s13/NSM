@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Norwegian Singles Planner</title>
   <meta name="description" content="Predicted training paces and a 12-week sub-threshold workout builder for the Norwegian Singles method." />
-  <link rel="stylesheet" href="styles.css?v=9" />
+  <link rel="stylesheet" href="styles.css?v=11" />
 </head>
 <body>
   <header class="site-header">
@@ -74,8 +74,11 @@
 
     <!-- ================= BUILDER ================= -->
     <section id="panel-builder" role="tabpanel" aria-labelledby="tab-builder" hidden>
-      <div class="card">
-        <h2>Plan settings</h2>
+      <details class="card collapsible" id="plan-settings" open>
+        <summary>
+          <h2>Plan settings</h2>
+          <span class="summary-line" id="settings-summary"></span>
+        </summary>
         <p class="pb-summary" id="pb-summary"></p>
         <div class="form-grid">
           <label>Start date (week 1 Monday)
@@ -89,6 +92,12 @@
           </label>
           <label>Sub-T share of volume <span class="hint">% of weekly volume</span>
             <input id="subt-share" type="number" min="10" max="35" step="1" value="25" />
+          </label>
+          <label>Warm-up <span class="hint" id="wu-unit">km</span>
+            <input id="subt-warmup" type="number" min="0" max="10" step="0.5" value="2" />
+          </label>
+          <label>Cool-down <span class="hint" id="cd-unit">km</span>
+            <input id="subt-cooldown" type="number" min="0" max="10" step="0.5" value="1.5" />
           </label>
           <label>Rep format
             <select id="rep-format">
@@ -108,8 +117,11 @@
         </div>
 
         <p class="note" id="volume-summary"></p>
-        <p class="note">Volume rises at most 5% a week over the last full week. Lighter weeks drop to 80%, then the build resumes from where it left off. Sub-T rep counts are sized from each week's volume, so sessions grow as volume grows.</p>
-        <h3>Weekly template</h3>
+        <p class="note">Volume rises at most 5% a week over the last full week. Lighter weeks drop to 80%, then the build resumes from where it left off. Sub-T rep counts are sized from each week's volume, so sessions grow as volume grows. Warm-up and cool-down apply to every sub-T and 400s / hills session.</p>
+      </details>
+
+      <div class="card">
+        <h2>Weekly template</h2>
         <div class="week-template" id="week-template"></div>
         <p class="note">Classic layout: 2–3 sub-threshold days with an easy day between each, plus one long easy run. Most of your weekly volume should be easy running.</p>
       </div>
@@ -179,6 +191,6 @@
     <p>Your settings are saved in this browser only.</p>
   </footer>
 
-  <script src="app.js?v=9"></script>
+  <script src="app.js?v=11"></script>
 </body>
 </html>
