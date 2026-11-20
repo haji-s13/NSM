@@ -799,7 +799,6 @@
       totalEl.innerHTML =
         `<div class="stat"><span class="stat-label">12-week total</span><span class="stat-value">${dist(total, 0)}</span></div>` +
         `<div class="stat"><span class="stat-label">Weekly average</span><span class="stat-value">${dist(total / weeks.length, 0)}</span></div>` +
-        `<div class="stat"><span class="stat-label">Est. total time</span><span class="stat-value">${fmtDuration(totalTime)}</span></div>` +
         `<div class="stat"><span class="stat-label">Avg time / week</span><span class="stat-value">${fmtDuration(totalTime / weeks.length)}</span></div>` +
         `<div class="stat"><span class="stat-label">Sub-T reps</span><span class="stat-value">${dist(subt, 0)} <small>(${Math.round(subt / total * 100)}%)</small></span></div>`;
     }
