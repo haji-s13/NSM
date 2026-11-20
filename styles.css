@@ -278,3 +278,46 @@ table.data tr.pb-row td { font-weight: 700; }
 .vdot { color: var(--muted); font-weight: 600; }
 .vdot strong { color: var(--accent); font-size: 1.5rem; font-variant-numeric: tabular-nums; margin-left: 4px; }
 .coros-direct .icu-actions { margin: 0 0 14px; }
+
+/* Header account chip */
+.header-row { display: flex; justify-content: space-between; align-items: center; gap: 12px 20px; flex-wrap: wrap; }
+.header-row > div:first-child { min-width: 0; }
+.user-chip { display: inline-flex; align-items: center; gap: 10px; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.25); border-radius: 999px; padding: 4px 4px 4px 14px; font-size: .88rem; max-width: 100%; }
+.user-chip #user-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 22ch; }
+.chip-btn { font: inherit; font-weight: 600; font-size: .82rem; cursor: pointer; border: none; border-radius: 999px; padding: 5px 12px; background: #fff; color: #1f3a68; }
+.chip-btn:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+
+/* Home / sign-in */
+.home { padding-top: 28px; padding-bottom: 40px; }
+.home-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 32px; align-items: start; }
+@media (max-width: 760px) { .home-grid { grid-template-columns: 1fr; gap: 20px; } }
+.home-intro h2 { font-size: 1.6rem; line-height: 1.2; margin: 6px 0 10px; text-wrap: balance; }
+.home-intro .lead { font-size: 1.02rem; }
+.home-points { list-style: none; margin: 18px 0 0; padding: 0; display: grid; gap: 10px; }
+.home-points li { padding-left: 22px; position: relative; max-width: 60ch; }
+.home-points li::before { content: ""; position: absolute; left: 0; top: .55em; width: 10px; height: 10px; border-radius: 3px; background: var(--accent); }
+.home-card { padding: 20px; }
+.auth-tabs { display: grid; grid-template-columns: 1fr 1fr; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 3px; margin-bottom: 14px; }
+.auth-tab { font: inherit; font-weight: 600; border: none; background: none; color: var(--muted); padding: 8px; border-radius: 8px; cursor: pointer; }
+.auth-tab[aria-selected="true"] { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+.auth-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.auth-form { display: grid; gap: 12px; }
+.auth-msg { margin: 0; font-size: .88rem; color: var(--muted); min-height: 1.2em; }
+.auth-msg.error { color: var(--accent); font-weight: 600; }
+.auth-divider { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: .8rem; margin: 14px 0; }
+.auth-divider::before, .auth-divider::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+.btn-wide { width: 100%; }
+.btn:disabled { opacity: .65; cursor: progress; }
+
+/* My plans */
+.plans-head { display: flex; align-items: baseline; gap: 6px 14px; flex-wrap: wrap; margin-bottom: 10px; }
+.plans-head h2 { margin: 0; }
+.plans-save { display: flex; gap: 8px; align-items: end; flex-wrap: wrap; }
+.plans-name { flex: 1 1 240px; }
+.plan-list { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 6px; }
+.plan-row { display: flex; justify-content: space-between; align-items: center; gap: 8px 12px; flex-wrap: wrap; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; }
+.plan-row > div:first-child { min-width: 0; overflow-wrap: anywhere; }
+.plan-row.current { border-color: var(--easy-ink); background: var(--easy); }
+.plan-actions { display: flex; gap: 6px; }
+.plan-actions .copy-btn { margin: 0; position: static; }
+@media print { #plans-card, .user-chip { display: none !important; } }
