@@ -223,6 +223,15 @@ table.data tr.pb-row td { font-weight: 700; }
 }
 .chart-tip .tip-val { font-weight: 700; font-variant-numeric: tabular-nums; }
 
+.day-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: auto; position: relative; top: 8px; margin-bottom: 8px; }
+.day-actions .copy-btn { margin: 0; position: static; }
+.push-week { margin-left: 8px; vertical-align: 1px; position: static; top: 0; }
+.copy-btn:disabled { opacity: .7; cursor: progress; }
+.push-msg { color: var(--muted); font-size: .85rem; align-self: center; }
+.push-msg.error { color: var(--accent); font-weight: 600; }
+@media (max-width: 760px) { .day-actions { grid-column: 2; } }
+@media print { .day-actions, .push-week, #icu-settings { display: none !important; } }
+
 .site-footer { color: var(--muted); font-size: .8rem; padding-bottom: 24px; }
 
 @media print {

@@ -321,6 +321,7 @@
         detail: `Thorough warm-up with strides. Current PB pace ${pace(target.pace)} (${fmtTime(target.time)})`,
         km: raceKm + 5,
         wu: 3, cd: 2, wuExtra: " + strides",
+        raceKm, racePace: target.pace,
         main: `${what} @ current PB pace ${pace(target.pace)} (${fmtTime(target.time)})`,
       };
     }
@@ -333,6 +334,7 @@
         km: 3 + n * 0.4 + (n - 1) * 0.08 + 2,
         repKm: n * 0.4,
         wu: 3, cd: 2,
+        reps: { n, stepKm: 0.4, recS: 30, pace: p.hills, recLabel: "Rest" },
       };
     }
 
@@ -348,7 +350,10 @@
       repKm = n * s.distKm;
     }
     const recKm = (n - 1) * (s.recS / 420); // slow jog ≈ 7:00/km
-    return { type, title: s.name, detail, km: 2 + repKm + recKm + 1.5, repKm, wuNote: true, wu: 2, cd: 1.5 };
+    return {
+      type, title: s.name, detail, km: 2 + repKm + recKm + 1.5, repKm, wuNote: true, wu: 2, cd: 1.5,
+      reps: { n, stepKm: fmt === "time" ? null : s.distKm, stepMin: s.min, recS: s.recS, pace: pc, recLabel: "Jog" },
+    };
   }
 
   function buildPlan(m) {
@@ -474,12 +479,12 @@
           <div class="day-title">${d.title}</div>
           <div class="day-detail">${d.detail}</div>
           ${kmTxt ? `<div class="day-dist">${kmTxt}</div>` : ""}
-          ${d.type !== "rest" ? `<button type="button" class="copy-btn" data-week="${wk.n - 1}" data-day="${i}" aria-label="Copy ${DAYS[i]} week ${wk.n} workout">Copy</button>` : ""}
+          ${d.type !== "rest" ? `<div class="day-actions"><button type="button" class="copy-btn" data-week="${wk.n - 1}" data-day="${i}" aria-label="Copy ${DAYS[i]} week ${wk.n} workout">Copy</button>${PUSH_ENABLED ? `<button type="button" class="copy-btn push-day" data-week="${wk.n - 1}" data-day="${i}" aria-label="Send ${DAYS[i]} week ${wk.n} workout to intervals.icu">Send</button>` : ""}</div>` : ""}
         </div>`;
       }).join("");
       return `<article class="week">
         <div class="week-head">
-          <h3>Week ${wk.n} <span class="hint">· ${fmtShortDate(wk.weekStart)}</span></h3>
+          <h3>Week ${wk.n} <span class="hint">· ${fmtShortDate(wk.weekStart)}</span>${PUSH_ENABLED ? ` <button type="button" class="copy-btn push-week" data-week="${wk.n - 1}">Send week</button>` : ""}</h3>
           <div class="week-meta">
             <span class="pill phase">${wk.phase}</span>
             ${wk.deload ? `<span class="pill phase">Lighter week</span>` : ""}
@@ -520,6 +525,122 @@
     lines.push(`Total: ${dist(d.km)}`);
     return lines.join("\n");
   }
+
+  // ---------------------------------------------------------------- intervals.icu
+  // Set to false by the single-file build, whose sandbox cannot reach other sites.
+  const PUSH_ENABLED = true;
+  const ICU_BASE = "https://intervals.icu/api/v1/athlete/";
+  let icuKeyMemory = "";
+
+  function icuKey() {
+    if (icuKeyMemory) return icuKeyMemory;
+    try { return localStorage.getItem("nsm-icu-key") || ""; } catch (e) { return ""; }
+  }
+  function setIcuKey(key, remember) {
+    icuKeyMemory = key;
+    try {
+      if (remember && key) localStorage.setItem("nsm-icu-key", key);
+      else localStorage.removeItem("nsm-icu-key");
+    } catch (e) { /* ignore */ }
+  }
+
+  /** "4:12/km" style pace for the intervals.icu workout builder. */
+  function icuPace(secPerKm) {
+    const mi = state.units === "mi";
+    return `${fmtTime(mi ? secPerKm * KM_PER_MI : secPerKm)}/${mi ? "mi" : "km"}`;
+  }
+  const icuRange = (r) => `${icuPace(r.lo)}-${icuPace(r.hi)} Pace`;
+  const icuKm = (km) => `${Math.round(km * 10) / 10}km`;
+
+  /** Workout text in intervals.icu workout-builder syntax. */
+  function icuDescription(wk, d) {
+    const easy = icuRange(lastPaces.easy);
+    const out = [`Norwegian Singles · Week ${wk.n} (${wk.phase})`, ""];
+    if (d.type === "easy" || d.type === "longrun") {
+      out.push(`- ${d.type === "longrun" ? "Long run" : "Easy"} ${icuKm(d.km)} ${easy}`);
+      if (d.strides) {
+        const fast = lastPaces.hills.lo - 15;
+        out.push("", "Strides 6x", `- Stride 20s ${icuPace(fast)} Pace`, `- Walk/jog 60s ${easy}`, "");
+      }
+      return out.join("\n");
+    }
+    if (d.wu) out.push(`- Warmup ${icuKm(d.wu)} ${easy}`, "");
+    if (d.type === "race") {
+      out.push(`- ${d.title} ${icuKm(d.raceKm)} ${icuPace(d.racePace)} Pace`, "");
+    } else if (d.reps) {
+      const r = d.reps;
+      const step = r.stepKm ? (r.stepKm < 1 ? `${Math.round(r.stepKm * 1000)}mtr` : `${r.stepKm}km`) : `${r.stepMin}m`;
+      out.push(`Main Set ${r.n}x`, `- ${step} ${icuRange(r.pace)}`, `- ${r.recLabel} ${r.recS}s ${easy}`, "");
+    }
+    if (d.cd) out.push(`- Cooldown ${icuKm(d.cd)} ${easy}`);
+    return out.join("\n");
+  }
+
+  function icuEvent(wk, d, i) {
+    const date = new Date(wk.weekStart);
+    date.setDate(date.getDate() + i);
+    const day = isoDate(date);
+    return {
+      category: "WORKOUT",
+      type: "Run",
+      start_date_local: `${day}T00:00:00`,
+      name: d.title,
+      description: icuDescription(wk, d),
+      external_id: `nsm-${day}`,
+    };
+  }
+
+  /** Replaces this planner's workouts on the given dates, then creates them. */
+  async function icuPush(events) {
+    const key = icuKey();
+    if (!key) throw new Error("Add your intervals.icu API key in Plan settings first.");
+    const athlete = encodeURIComponent((state.icuAthlete || "").trim() || "0");
+    const headers = {
+      Authorization: "Basic " + btoa("API_KEY:" + key),
+      "Content-Type": "application/json",
+    };
+    const call = async (path, method, body) => {
+      let res;
+      try {
+        res = await fetch(ICU_BASE + athlete + path, { method, headers, body: JSON.stringify(body) });
+      } catch (e) {
+        throw new Error("Couldn't reach intervals.icu. Check your connection and try again.");
+      }
+      if (res.status === 401 || res.status === 403) throw new Error("intervals.icu rejected the API key or athlete ID. Check them in Plan settings.");
+      if (!res.ok) throw new Error(`intervals.icu returned an error (${res.status}).`);
+      return res;
+    };
+    await call("/events/bulk-delete", "PUT", events.map((e) => ({ external_id: e.external_id })));
+    await call("/events/bulk", "POST", events);
+    return events.length;
+  }
+
+  function pushStatus(text, isError) {
+    const el = document.getElementById("push-msg");
+    if (!el) return;
+    el.textContent = text;
+    el.classList.toggle("error", !!isError);
+  }
+
+  async function runPush(btn, events, label) {
+    if (!events.length) return;
+    const original = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "Sending…";
+    try {
+      const n = await icuPush(events);
+      btn.textContent = "Sent";
+      btn.classList.add("done");
+      pushStatus(`Sent ${n} workout${n === 1 ? "" : "s"} (${label}) to intervals.icu.`);
+    } catch (e) {
+      btn.textContent = "Failed";
+      pushStatus(e.message, true);
+    } finally {
+      setTimeout(() => { btn.textContent = original; btn.disabled = false; btn.classList.remove("done"); }, 2000);
+    }
+  }
+
+  const weekEvents = (wk) => wk.days.map((d, i) => (d.type === "rest" ? null : icuEvent(wk, d, i))).filter(Boolean);
 
   /** Copies text inside a click handler; falls back to a hidden textarea. */
   function copyText(text) {
@@ -774,9 +895,39 @@
     document.getElementById("btn-print").addEventListener("click", () => window.print());
     document.getElementById("btn-csv").addEventListener("click", exportCSV);
 
+    const icuSection = document.getElementById("icu-settings");
+    const pushAll = document.getElementById("btn-push-all");
+    if (!PUSH_ENABLED) {
+      if (icuSection) icuSection.hidden = true;
+      if (pushAll) pushAll.hidden = true;
+    } else {
+      const keyEl = document.getElementById("icu-key");
+      const rememberEl = document.getElementById("icu-remember");
+      const athleteEl = document.getElementById("icu-athlete");
+      keyEl.value = icuKey();
+      rememberEl.checked = !!keyEl.value;
+      athleteEl.value = state.icuAthlete || "";
+      const updateKey = () => setIcuKey(keyEl.value.trim(), rememberEl.checked);
+      keyEl.addEventListener("input", updateKey);
+      rememberEl.addEventListener("change", updateKey);
+      athleteEl.addEventListener("input", () => { state.icuAthlete = athleteEl.value.trim(); save(); });
+      pushAll.addEventListener("click", () => runPush(pushAll, lastWeeks.flatMap(weekEvents), "all 12 weeks"));
+    }
+
     document.getElementById("plan").addEventListener("click", (e) => {
       const btn = e.target.closest(".copy-btn");
       if (!btn) return;
+      if (btn.classList.contains("push-week")) {
+        const wk = lastWeeks[Number(btn.dataset.week)];
+        if (wk) runPush(btn, weekEvents(wk), `week ${wk.n}`);
+        return;
+      }
+      if (btn.classList.contains("push-day")) {
+        const wk = lastWeeks[Number(btn.dataset.week)];
+        const i = Number(btn.dataset.day);
+        if (wk && wk.days[i]) runPush(btn, [icuEvent(wk, wk.days[i], i)], `week ${wk.n} ${DAYS[i]}`);
+        return;
+      }
       const wk = lastWeeks[Number(btn.dataset.week)];
       const d = wk && wk.days[Number(btn.dataset.day)];
       if (!d) return;

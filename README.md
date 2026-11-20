@@ -19,6 +19,7 @@ A static web app (plain HTML, CSS and JavaScript, no build step) with two tabs:
    - Easy-run distances calculated to fill the weekly volume target
    - 6 × 20s strides added to the first easy run of each week
    - A weekly volume bar chart coloured by phase (base, build, peak, race/trial), lighter weeks hatched, peak target line, hover for details, and 12-week total, weekly average and sub-T totals below it
+   - Send buttons (per day, per week, or all 12 weeks) that push workouts with pace targets to intervals.icu using your API key, from where they sync to COROS, Garmin and other watches. This needs the hosted version (GitHub Pages or a local server), not the single-file preview.
    - A Copy button on each day that copies a plain-text workout for a Strava description
    - Print and CSV export
 
