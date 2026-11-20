@@ -23,7 +23,7 @@ A static web app (plain HTML, CSS and JavaScript, no build step) with three tabs
    - 6 × 20s strides added to the first easy run of each week
    - A weekly volume bar chart coloured by phase (base, build, peak, race/trial), lighter weeks hatched, peak target line, hover for details, estimated hours per week under each bar, and 12-week total, weekly average, average weekly time and sub-T totals below it
    - Send buttons (per day, per week, or all 12 weeks) that push workouts with pace targets to intervals.icu using the API key from the intervals.icu tab, from where they sync to COROS, Garmin and other watches. This needs the hosted version (GitHub Pages or a local server), not the single-file preview.
-   - COROS buttons (per day, per week, or all weeks) that add structured workouts with pace ranges to your COROS training schedule through the "Claude NSM" claude.ai connector. These only appear when the planner is open on claude.ai with that connector connected.
+   - COROS buttons (per day, per week, or all weeks) that add structured workouts with pace ranges to your COROS training schedule. On claude.ai they use the "Claude NSM" connector; on the hosted site, "Connect COROS" on the Connections tab signs in to the COROS MCP server directly (OAuth with PKCE, tokens kept in the browser).
    - A Copy button on each day that copies a plain-text workout for a Strava description
    - Print and CSV export
 3. **Connections** – COROS status, plus the intervals.icu API key, optional athlete ID and a Check connection button.

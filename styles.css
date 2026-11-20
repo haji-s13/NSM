@@ -52,6 +52,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 
 body {
   margin: 0;
@@ -276,3 +277,4 @@ table.data tr.pb-row td { font-weight: 700; }
 .vdot-head h2 { margin: 0; }
 .vdot { color: var(--muted); font-weight: 600; }
 .vdot strong { color: var(--accent); font-size: 1.5rem; font-variant-numeric: tabular-nums; margin-left: 4px; }
+.coros-direct .icu-actions { margin: 0 0 14px; }
