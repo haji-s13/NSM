@@ -229,6 +229,10 @@ table.data tr.pb-row td { font-weight: 700; }
 .copy-btn:disabled { opacity: .7; cursor: progress; }
 .push-msg { color: var(--muted); font-size: .85rem; align-self: center; }
 .push-msg.error { color: var(--accent); font-weight: 600; }
+.push-msg.ok { color: var(--easy-ink); font-weight: 600; }
+.lead { margin: 0 0 14px; max-width: 65ch; }
+.icu-actions { margin: 14px 0 0; }
+.steps { margin: 0; padding-left: 20px; display: grid; gap: 4px; max-width: 70ch; }
 @media (max-width: 760px) { .day-actions { grid-column: 2; } }
 @media print { .day-actions, .push-week, #icu-settings { display: none !important; } }
 
