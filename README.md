@@ -10,8 +10,10 @@ A static web app (plain HTML, CSS and JavaScript, no build step) with two tabs:
    - Easy and long runs: Daniels E (62–74% VDOT)
    - Reference rows: Daniels T (83–88% VDOT) and marathon pace
    - An optional ± sec/km adjustment applies to all sub-T paces.
-2. **12-Week Builder** – choose a start date, peak weekly volume, rep format and a weekly template (which day gets which session). It generates 12 weeks with:
-   - Base (weeks 1–4), Build (5–8) and Peak (9–11) phases, with rep counts that progress each week
+2. **12-Week Builder** – choose a start date, starting and peak weekly volume, sub-T share of volume, rep format and a weekly template (which day gets which session). It generates 12 weeks with:
+   - Weekly volume that rises from the starting volume toward the peak by at most 5% a week
+   - Sub-T rep counts sized from each week's volume (the sub-T share split across the week's sessions), so sessions grow with volume
+   - Base (weeks 1–4), Build (5–8) and Peak (9–11) phases
    - Optional lighter weeks in weeks 4 and 8
    - Week 12 as a taper and race, a time trial, or a normal week
    - Easy-run distances calculated to fill the weekly volume target
@@ -31,4 +33,4 @@ It can also be hosted as-is on GitHub Pages.
 
 ## Tuning
 
-The progression tables (`PROG`, `TAPER`) and pace definitions (in `model()`) are at the top of `app.js`.
+The progression settings (`MAX_WEEKLY_INCREASE`, `REPS`, deload and taper factors) and pace definitions (in `model()`) are at the top of `app.js`.

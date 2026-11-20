@@ -80,8 +80,14 @@
           <label>Start date (week 1 Monday)
             <input id="start-date" type="date" />
           </label>
+          <label>Starting weekly volume <span class="hint" id="start-unit">km</span>
+            <input id="start-volume" type="number" min="10" max="250" step="1" value="55" />
+          </label>
           <label>Peak weekly volume <span class="hint" id="vol-unit">km</span>
             <input id="peak-volume" type="number" min="15" max="250" step="1" value="75" />
+          </label>
+          <label>Sub-T share of volume <span class="hint">% of weekly volume</span>
+            <input id="subt-share" type="number" min="10" max="35" step="1" value="25" />
           </label>
           <label>Rep format
             <select id="rep-format">
@@ -100,6 +106,8 @@
           <label class="check"><input id="deloads" type="checkbox" checked /> Lighter week every 4th week</label>
         </div>
 
+        <p class="note" id="volume-summary"></p>
+        <p class="note">Volume rises at most 5% a week over the last full week. Lighter weeks drop to 80%, then the build resumes from where it left off. Sub-T rep counts are sized from each week's volume, so sessions grow as volume grows.</p>
         <h3>Weekly template</h3>
         <div class="week-template" id="week-template"></div>
         <p class="note">Classic layout: 2–3 sub-threshold days with an easy day between each, plus one long easy run. Most of your weekly volume should be easy running.</p>
