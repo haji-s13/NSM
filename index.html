@@ -147,6 +147,8 @@
       <div class="card" id="icu-settings">
         <h2>Connect intervals.icu</h2>
         <p class="lead">Connect your intervals.icu account to send planned workouts from the 12-Week Builder. They then sync from intervals.icu to your watch (COROS, Garmin and others) if you've connected it there.</p>
+        <div id="icu-unavailable" class="warning" hidden>Sending to intervals.icu doesn't work in this preview, because it can't connect to other websites. Open the hosted planner at <strong>haji-s13.github.io/NSM</strong> to connect your account and send workouts.</div>
+        <div id="icu-form">
         <div class="form-grid">
           <label>API key <span class="hint">intervals.icu → Settings → Developer</span>
             <input id="icu-key" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your API key" />
@@ -159,6 +161,7 @@
         <div class="toolbar icu-actions">
           <button id="btn-icu-check" class="btn">Check connection</button>
           <span id="icu-check-msg" class="push-msg" role="status"></span>
+        </div>
         </div>
         <h3>How sending works</h3>
         <ul class="steps">

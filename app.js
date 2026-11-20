@@ -858,7 +858,7 @@
 
   const TABS = ["paces", "builder", "intervals"];
   function showTab(name) {
-    if (!TABS.includes(name) || (name === "intervals" && !PUSH_ENABLED)) name = "paces";
+    if (!TABS.includes(name)) name = "paces";
     TABS.forEach((t) => {
       document.getElementById(`tab-${t}`).setAttribute("aria-selected", String(t === name));
       document.getElementById(`panel-${t}`).hidden = t !== name;
@@ -906,7 +906,8 @@
 
     const pushAll = document.getElementById("btn-push-all");
     if (!PUSH_ENABLED) {
-      document.getElementById("tab-intervals").hidden = true;
+      document.getElementById("icu-form").hidden = true;
+      document.getElementById("icu-unavailable").hidden = false;
       if (pushAll) pushAll.hidden = true;
     } else {
       const keyEl = document.getElementById("icu-key");
