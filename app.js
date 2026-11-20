@@ -38,17 +38,21 @@
     long: { name: "Sub-T long", distKm: 3, distLabel: "3 km", min: 10, recS: 90, race: "30k" },
   };
 
-  // 12-week progression. Index 0 = week 1.
-  // Weeks 4 and 8 are lighter weeks; week 12 is overridden by the "Week 12" setting.
-  const PROG = {
-    volume: [0.80, 0.85, 0.90, 0.75, 0.90, 0.95, 1.00, 0.80, 0.95, 1.00, 1.00, 0.95],
-    short: [8, 9, 10, 7, 10, 10, 11, 8, 10, 11, 10, 10],
-    medium: [4, 4, 5, 3, 5, 5, 5, 4, 5, 5, 5, 5],
-    long: [2, 3, 3, 2, 3, 3, 3, 2, 3, 3, 3, 3],
-    hills: [16, 18, 20, 14, 20, 22, 24, 16, 22, 24, 20, 20],
+  // Volume progression: week 1 starts at the starting volume and each full week
+  // rises by at most MAX_WEEKLY_INCREASE until the peak is reached.
+  const MAX_WEEKLY_INCREASE = 0.05;
+  const DELOAD_WEEKS = [3, 7]; // zero-based: weeks 4 and 8
+  const DELOAD_FACTOR = 0.8;   // lighter week = 80% of the current build level
+  const TAPER_FACTOR = 0.65;   // race / time-trial week
+
+  // Sub-T rep counts are sized from the week's volume: the sub-T share of weekly
+  // volume is split across the week's quality sessions by weight, then clamped.
+  const REPS = {
+    short: { min: 4, max: 12, weight: 1 },
+    medium: { min: 2, max: 6, weight: 1 },
+    long: { min: 2, max: 4, weight: 1 },
+    hills: { min: 8, max: 25, weight: 0.6, repKm: 0.4 },
   };
-  const DELOAD_WEEKS = [3, 7]; // zero-based
-  const TAPER = { volume: 0.65, short: 6, medium: 3, long: 2, hills: 12 };
 
   const DEFAULTS = {
     pbDistance: "5000",
@@ -56,7 +60,9 @@
     units: "km",
     paceAdjust: 0,
     startDate: nextMonday(),
+    startVolume: 55,
     peakVolume: 75,
+    subtShare: 25,
     repFormat: "distance",
     finalWeek: "race",
     deloads: true,
@@ -249,23 +255,38 @@
   }
 
   // ---------------------------------------------------------------- tab 2: builder
-  function weekValues(w) {
-    // w is zero-based
-    let i = w;
-    if (!state.deloads && DELOAD_WEEKS.includes(w)) i = w - 1; // repeat previous week instead
-    const v = {
-      volume: PROG.volume[i], short: PROG.short[i], medium: PROG.medium[i],
-      long: PROG.long[i], hills: PROG.hills[i],
-      deload: state.deloads && DELOAD_WEEKS.includes(w),
-    };
-    if (w === 11) {
-      if (state.finalWeek === "race" || state.finalWeek === "test") {
-        Object.assign(v, TAPER);
-      } else {
-        Object.assign(v, { volume: PROG.volume[10], short: PROG.short[10], medium: PROG.medium[10], long: PROG.long[10], hills: PROG.hills[10] });
-      }
+  /** Weekly volume targets (km) for all 12 weeks. */
+  function volumePlan() {
+    const toKm = (v) => (state.units === "mi" ? Number(v) * KM_PER_MI : Number(v));
+    const startKm = Math.max(toKm(state.startVolume) || 0, 10);
+    const peakKm = Math.max(toKm(state.peakVolume) || 0, startKm);
+    const out = [];
+    let level = startKm; // current build level
+    for (let w = 0; w < 12; w++) {
+      const taper = w === 11 && (state.finalWeek === "race" || state.finalWeek === "test");
+      const deload = state.deloads && DELOAD_WEEKS.includes(w);
+      if (w > 0 && !taper && !deload) level = Math.min(peakKm, level * (1 + MAX_WEEKLY_INCREASE));
+      const km = taper ? level * TAPER_FACTOR : deload ? level * DELOAD_FACTOR : level;
+      out.push({ km, deload, taper, atPeak: level >= peakKm - 0.05 });
     }
-    return v;
+    return { weeks: out, startKm, peakKm };
+  }
+
+  /** Rep counts for the week's quality sessions, sized from weekly volume. */
+  function repCounts(tmpl, weekKm, p, fmt) {
+    const quality = tmpl.filter((t) => REPS[t]);
+    const totalWeight = quality.reduce((a, t) => a + REPS[t].weight, 0);
+    const budget = weekKm * (Number(state.subtShare) || 25) / 100;
+    const counts = {};
+    quality.forEach((t) => {
+      if (counts[t] != null) return;
+      const r = REPS[t];
+      const perRepKm = t === "hills" ? r.repKm
+        : fmt === "time" ? (SUBT[t].min * 60) / mid(p[t]) : SUBT[t].distKm;
+      const raw = (budget * r.weight / totalWeight) / perRepKm;
+      counts[t] = Math.min(r.max, Math.max(r.min, Math.round(raw)));
+    });
+    return counts;
   }
 
   function phaseFor(w) {
@@ -305,6 +326,7 @@
         type, title: "400s / hills",
         detail: `${n} × 400 m @ ${rangeOf(p.hills)} (${fmtTime(p.hills.lo * 0.4)}–${fmtTime(p.hills.hi * 0.4)}), 30s rest, or ${n} × 200 m hills, jog down`,
         km: 3 + n * 0.4 + (n - 1) * 0.08 + 2,
+        repKm: n * 0.4,
       };
     }
 
@@ -320,18 +342,18 @@
       repKm = n * s.distKm;
     }
     const recKm = (n - 1) * (s.recS / 420); // slow jog ≈ 7:00/km
-    return { type, title: s.name, detail, km: 2 + repKm + recKm + 1.5, wuNote: true };
+    return { type, title: s.name, detail, km: 2 + repKm + recKm + 1.5, repKm, wuNote: true };
   }
 
   function buildPlan(m) {
     const p = m.paces;
-    const peakKm = state.units === "mi" ? state.peakVolume * KM_PER_MI : Number(state.peakVolume);
+    const vp = volumePlan();
     const start = parseDate(state.startDate) || parseDate(nextMonday());
     const raceKm = Number(state.pbDistance) / 1000;
     const weeks = [];
 
     for (let w = 0; w < 12; w++) {
-      const wv = weekValues(w);
+      const vw = vp.weeks[w];
       const fmt = repFormatFor(w);
       let tmpl = state.template.slice();
 
@@ -345,8 +367,10 @@
         for (let i = last + 1; i < 7; i++) if (tmpl[i] === "longrun" || SESSION_TYPES[tmpl[i]]?.quality) tmpl[i] = "easy";
       }
 
+      const targetKm = vw.km;
+      // Size reps from the normal template so a race week tapers the remaining sessions.
+      const wv = repCounts(state.template, targetKm, p, fmt);
       const days = tmpl.map((t) => buildSession(t, w, wv, p, fmt, raceKm));
-      const targetKm = peakKm * wv.volume;
 
       const longRun = days.find((d) => d.type === "longrun");
       if (longRun) longRun.km = Math.min(Math.max(targetKm * 0.22, 8), 32);
@@ -359,13 +383,15 @@
       easyDays.forEach((d) => { d.km = easyEach; });
 
       const totalKm = days.reduce((a, d) => a + (d.km || 0), 0);
+      const subtKm = days.filter((d) => d.repKm).reduce((a, d) => a + d.repKm, 0);
       const weekStart = new Date(start);
       weekStart.setDate(start.getDate() + 7 * w);
 
       weeks.push({
-        n: w + 1, phase: phaseFor(w), deload: wv.deload, fmt, days, totalKm, targetKm, tooLow, weekStart,
+        n: w + 1, phase: phaseFor(w), deload: vw.deload, atPeak: vw.atPeak, fmt, days, totalKm, targetKm, subtKm, tooLow, weekStart,
       });
     }
+    weeks.volume = vp;
     return weeks;
   }
 
@@ -390,6 +416,7 @@
     const planEl = document.getElementById("plan");
     const warnEl = document.getElementById("plan-warnings");
     document.getElementById("vol-unit").textContent = unitDist() + " / week";
+    document.getElementById("start-unit").textContent = unitDist() + " / week";
 
     if (!m) {
       summary.innerHTML = `Enter a valid PB on the <a href="#paces">Predicted Paces</a> tab first.`;
@@ -405,8 +432,20 @@
     if (weeks.some((w) => w.tooLow)) {
       warns.push(`Your peak volume is too low for this template: some easy runs were raised to the ${dist(MIN_EASY_KM)} minimum, so weekly totals are above target. Raise the volume or swap an easy day for rest.`);
     }
+    const sv = Number(state.startVolume), pv = Number(state.peakVolume);
+    if (sv > pv) warns.push(`Your starting volume is above your peak, so the plan holds at ${dist(weeks.volume.startKm, 0)}.`);
     warnEl.innerHTML = warns.map((w) => `<div class="warning">${w}</div>`).join("");
 
+    // Change vs the last full week (lighter and taper weeks are skipped).
+    const full = (x) => !x.deload && !weeks.volume.weeks[x.n - 1].taper;
+    const changeTxt = (wk, all) => {
+      if (!full(wk)) return "";
+      const prev = all.slice(0, wk.n - 1).reverse().find(full);
+      if (!prev) return "";
+      const pct = Math.round((wk.targetKm / prev.targetKm - 1) * 100);
+      return ` <span class="hint">(${pct > 0 ? "+" : ""}${pct}% vs last full week)</span>`;
+    };
+    renderVolumeSummary(weeks);
     planEl.innerHTML = weeks.map((wk) => {
       const days = wk.days.map((d, i) => {
         const date = new Date(wk.weekStart);
@@ -427,12 +466,24 @@
             <span class="pill phase">${wk.phase}</span>
             ${wk.deload ? `<span class="pill phase">Lighter week</span>` : ""}
             <span>${wk.fmt === "time" ? "Time reps" : "Distance reps"}</span>
-            <span><strong>${dist(wk.totalKm, 0)}</strong> total</span>
+            <span>Sub-T ${dist(wk.subtKm, 0)} (${Math.round(wk.subtKm / wk.totalKm * 100)}%)</span>
+            <span><strong>${dist(wk.totalKm, 0)}</strong> total${changeTxt(wk, weeks)}</span>
           </div>
         </div>
         <div class="days">${days}</div>
       </article>`;
     }).join("");
+  }
+
+  function renderVolumeSummary(weeks) {
+    const el = document.getElementById("volume-summary");
+    const vp = weeks.volume;
+    const peakWeek = vp.weeks.findIndex((w) => w.atPeak && !w.deload && !w.taper);
+    const reach = peakWeek >= 0
+      ? `reaches your ${dist(vp.peakKm, 0)} peak in week ${peakWeek + 1}`
+      : `reaches ${dist(Math.max(...vp.weeks.filter((w) => !w.deload && !w.taper).map((w) => w.km)), 0)} by week 11 (peak of ${dist(vp.peakKm, 0)} not reached at 5% a week)`;
+    el.innerHTML = `Starts at <strong>${dist(vp.startKm, 0)}</strong> and ${reach}. ` +
+      `Planned weeks: ${vp.weeks.map((w) => dist(w.km, 0).split(" ")[0]).join(" · ")} ${unitDist()}.`;
   }
 
   function renderTemplate() {
@@ -481,6 +532,8 @@
     "pace-adjust": "paceAdjust",
     "start-date": "startDate",
     "peak-volume": "peakVolume",
+    "start-volume": "startVolume",
+    "subt-share": "subtShare",
     "rep-format": "repFormat",
     "final-week": "finalWeek",
   };
@@ -506,11 +559,13 @@
       const el = document.getElementById(id);
       const handler = () => {
         let v = el.value;
-        if (key === "peakVolume" || key === "paceAdjust") v = Number(v) || 0;
+        if (["peakVolume", "startVolume", "paceAdjust", "subtShare"].includes(key)) v = Number(v) || 0;
         if (key === "units" && v !== state.units) {
           const conv = v === "mi" ? 1 / KM_PER_MI : KM_PER_MI;
           state.peakVolume = Math.round(Number(state.peakVolume) * conv);
+          state.startVolume = Math.round(Number(state.startVolume) * conv);
           document.getElementById("peak-volume").value = state.peakVolume;
+          document.getElementById("start-volume").value = state.startVolume;
         }
         state[key] = v;
         save();
