@@ -141,6 +141,8 @@
 
   // ---------------------------------------------------------------- state
   let state = load();
+  let lastWeeks = [];
+  let lastPaces = null;
 
   function load() {
     try {
@@ -317,6 +319,8 @@
         type, title: what,
         detail: `Thorough warm-up with strides. Current PB pace ${pace(target.pace)} (${fmtTime(target.time)})`,
         km: raceKm + 5,
+        wu: 3, cd: 2, wuExtra: " + strides",
+        main: `${what} @ current PB pace ${pace(target.pace)} (${fmtTime(target.time)})`,
       };
     }
 
@@ -327,6 +331,7 @@
         detail: `${n} × 400 m @ ${rangeOf(p.hills)} (${fmtTime(p.hills.lo * 0.4)}–${fmtTime(p.hills.hi * 0.4)}), 30s rest, or ${n} × 200 m hills, jog down`,
         km: 3 + n * 0.4 + (n - 1) * 0.08 + 2,
         repKm: n * 0.4,
+        wu: 3, cd: 2,
       };
     }
 
@@ -342,7 +347,7 @@
       repKm = n * s.distKm;
     }
     const recKm = (n - 1) * (s.recS / 420); // slow jog ≈ 7:00/km
-    return { type, title: s.name, detail, km: 2 + repKm + recKm + 1.5, repKm, wuNote: true };
+    return { type, title: s.name, detail, km: 2 + repKm + recKm + 1.5, repKm, wuNote: true, wu: 2, cd: 1.5 };
   }
 
   function buildPlan(m) {
@@ -428,6 +433,8 @@
     summary.innerHTML = `Using your <strong>${pbLabel} PB of ${fmtTime(m.pbSec)}</strong>. VDOT ${m.vdot.toFixed(1)}. Sub-T paces: short ${rangeOf(m.paces.short)} · medium ${rangeOf(m.paces.medium)} · long ${rangeOf(m.paces.long)}. <a href="#paces">Change</a>`;
 
     const weeks = buildPlan(m);
+    lastWeeks = weeks;
+    lastPaces = m.paces;
     const warns = templateWarnings();
     if (weeks.some((w) => w.tooLow)) {
       warns.push(`Your peak volume is too low for this template: some easy runs were raised to the ${dist(MIN_EASY_KM)} minimum, so weekly totals are above target. Raise the volume or swap an easy day for rest.`);
@@ -457,6 +464,7 @@
           <div class="day-title">${d.title}</div>
           <div class="day-detail">${d.detail}</div>
           ${kmTxt ? `<div class="day-dist">${kmTxt}</div>` : ""}
+          ${d.type !== "rest" ? `<button type="button" class="copy-btn" data-week="${wk.n - 1}" data-day="${i}" aria-label="Copy ${DAYS[i]} week ${wk.n} workout">Copy</button>` : ""}
         </div>`;
       }).join("");
       return `<article class="week">
@@ -484,6 +492,43 @@
       : `reaches ${dist(Math.max(...vp.weeks.filter((w) => !w.deload && !w.taper).map((w) => w.km)), 0)} by week 11 (peak of ${dist(vp.peakKm, 0)} not reached at 5% a week)`;
     el.innerHTML = `Starts at <strong>${dist(vp.startKm, 0)}</strong> and ${reach}. ` +
       `Planned weeks: ${vp.weeks.map((w) => dist(w.km, 0).split(" ")[0]).join(" · ")} ${unitDist()}.`;
+  }
+
+  /** Plain-text version of one day's workout, for pasting into a Strava description. */
+  function workoutText(wk, d) {
+    const name = d.type === "easy" ? "Easy run" : d.title;
+    const head = `${name} – Week ${wk.n} (${wk.phase})`;
+    if (d.type === "easy" || d.type === "longrun") {
+      return [head, `${dist(d.km)} easy @ ${rangeOf(lastPaces.easy)}`].join("\n");
+    }
+    const lines = [head];
+    if (d.wu) lines.push(`Warm-up: ${dist(d.wu)} easy${d.wuExtra || ""}`);
+    lines.push(d.main || d.detail);
+    if (d.cd) lines.push(`Cool-down: ${dist(d.cd)} easy`);
+    lines.push(`Total: ${dist(d.km)}`);
+    return lines.join("\n");
+  }
+
+  /** Copies text inside a click handler; falls back to a hidden textarea. */
+  function copyText(text) {
+    const fallback = () => {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      let ok = false;
+      try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+      ta.remove();
+      return Promise.resolve(ok);
+    };
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        return navigator.clipboard.writeText(text).then(() => true, fallback);
+      }
+    } catch (e) { /* fall through */ }
+    return fallback();
   }
 
   function renderTemplate() {
@@ -589,6 +634,19 @@
 
     document.getElementById("btn-print").addEventListener("click", () => window.print());
     document.getElementById("btn-csv").addEventListener("click", exportCSV);
+
+    document.getElementById("plan").addEventListener("click", (e) => {
+      const btn = e.target.closest(".copy-btn");
+      if (!btn) return;
+      const wk = lastWeeks[Number(btn.dataset.week)];
+      const d = wk && wk.days[Number(btn.dataset.day)];
+      if (!d) return;
+      copyText(workoutText(wk, d)).then((ok) => {
+        btn.textContent = ok ? "Copied" : "Copy failed";
+        btn.classList.toggle("done", ok);
+        setTimeout(() => { btn.textContent = "Copy"; btn.classList.remove("done"); }, 1600);
+      });
+    });
     document.getElementById("btn-reset").addEventListener("click", () => {
       const keep = { pbDistance: state.pbDistance, pbTime: state.pbTime, units: state.units };
       state = Object.assign({}, DEFAULTS, keep, { template: DEFAULTS.template.slice(), startDate: nextMonday() });

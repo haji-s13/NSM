@@ -140,7 +140,7 @@ table.data tr.pb-row td { font-weight: 700; }
 .week-meta { color: var(--muted); font-size: .88rem; display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
 .phase { background: var(--accent-soft); color: var(--accent); }
 .days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
-.day { padding: 10px 10px 12px; border-right: 1px solid var(--border); min-height: 110px; }
+.day { padding: 10px 10px 12px; border-right: 1px solid var(--border); min-height: 110px; display: flex; flex-direction: column; }
 .day:last-child { border-right: none; }
 .day-name { font-size: .75rem; font-weight: 700; text-transform: uppercase; color: var(--muted); }
 .day-title { font-weight: 700; margin: 2px 0; font-size: .92rem; }
@@ -159,6 +159,16 @@ table.data tr.pb-row td { font-weight: 700; }
   .day-name { grid-row: span 3; padding-top: 2px; }
 }
 
+.copy-btn {
+  margin-top: auto; align-self: flex-start; position: relative; top: 8px; margin-bottom: 8px; font: inherit; font-size: .75rem; font-weight: 600; cursor: pointer;
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--border); border-radius: 6px; padding: 3px 10px;
+}
+.copy-btn:hover { border-color: var(--accent); }
+.copy-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.copy-btn.done { background: var(--accent); border-color: var(--accent); color: #fff; }
+@media (max-width: 760px) { .copy-btn { grid-column: 2; justify-self: start; } }
+
 .site-footer { color: var(--muted); font-size: .8rem; padding-bottom: 24px; }
 
 @media print {
@@ -168,6 +178,7 @@ table.data tr.pb-row td { font-weight: 700; }
   #panel-builder { display: block !important; }
   .week { border-color: #999; }
   .day { min-height: 0; }
+  .copy-btn { display: none; }
 }
 
 .vdot-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
