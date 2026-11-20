@@ -1,6 +1,6 @@
 # Norwegian Singles Planner
 
-A static web app (plain HTML, CSS and JavaScript, no build step) with two tabs:
+A static web app (plain HTML, CSS and JavaScript, no build step) with three tabs:
 
 1. **Predicted Paces** – enter a 5k or 10k PB to get their VDOT, predicted race times (Jack Daniels' VDOT formula) and training paces, each shown as a range:
    - Sub-T short (1k / 3 min reps): 15k → half marathon pace
@@ -19,9 +19,10 @@ A static web app (plain HTML, CSS and JavaScript, no build step) with two tabs:
    - Easy-run distances calculated to fill the weekly volume target
    - 6 × 20s strides added to the first easy run of each week
    - A weekly volume bar chart coloured by phase (base, build, peak, race/trial), lighter weeks hatched, peak target line, hover for details, and 12-week total, weekly average and sub-T totals below it
-   - Send buttons (per day, per week, or all 12 weeks) that push workouts with pace targets to intervals.icu using your API key, from where they sync to COROS, Garmin and other watches. This needs the hosted version (GitHub Pages or a local server), not the single-file preview.
+   - Send buttons (per day, per week, or all 12 weeks) that push workouts with pace targets to intervals.icu using the API key from the intervals.icu tab, from where they sync to COROS, Garmin and other watches. This needs the hosted version (GitHub Pages or a local server), not the single-file preview.
    - A Copy button on each day that copies a plain-text workout for a Strava description
    - Print and CSV export
+3. **intervals.icu** – API key, optional athlete ID, and a Check connection button for sending workouts from the builder.
 
 Settings are saved in the browser's localStorage.
 

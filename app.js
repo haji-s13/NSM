@@ -590,28 +590,36 @@
     };
   }
 
+  /** Authenticated call to the intervals.icu API for the configured athlete. */
+  async function icuCall(path, method, body) {
+    const key = icuKey();
+    if (!key) throw new Error("Add your API key on the intervals.icu tab first.");
+    const athlete = encodeURIComponent((state.icuAthlete || "").trim() || "0");
+    const headers = { Authorization: "Basic " + btoa("API_KEY:" + key) };
+    if (body !== undefined) headers["Content-Type"] = "application/json";
+    let res;
+    try {
+      res = await fetch(ICU_BASE + athlete + path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+    } catch (e) {
+      throw new Error("Couldn't reach intervals.icu. Check your connection and try again.");
+    }
+    if (res.status === 401 || res.status === 403) throw new Error("intervals.icu rejected the API key or athlete ID. Check them on the intervals.icu tab.");
+    if (res.status === 404) throw new Error("intervals.icu couldn't find that athlete ID. Leave it blank to use your own account.");
+    if (!res.ok) throw new Error(`intervals.icu returned an error (${res.status}).`);
+    return res;
+  }
+
+  /** Returns the connected athlete's name. */
+  async function icuCheck() {
+    const res = await icuCall("", "GET");
+    const data = await res.json().catch(() => ({}));
+    return data.name || [data.firstname, data.lastname].filter(Boolean).join(" ") || data.id || "";
+  }
+
   /** Replaces this planner's workouts on the given dates, then creates them. */
   async function icuPush(events) {
-    const key = icuKey();
-    if (!key) throw new Error("Add your intervals.icu API key in Plan settings first.");
-    const athlete = encodeURIComponent((state.icuAthlete || "").trim() || "0");
-    const headers = {
-      Authorization: "Basic " + btoa("API_KEY:" + key),
-      "Content-Type": "application/json",
-    };
-    const call = async (path, method, body) => {
-      let res;
-      try {
-        res = await fetch(ICU_BASE + athlete + path, { method, headers, body: JSON.stringify(body) });
-      } catch (e) {
-        throw new Error("Couldn't reach intervals.icu. Check your connection and try again.");
-      }
-      if (res.status === 401 || res.status === 403) throw new Error("intervals.icu rejected the API key or athlete ID. Check them in Plan settings.");
-      if (!res.ok) throw new Error(`intervals.icu returned an error (${res.status}).`);
-      return res;
-    };
-    await call("/events/bulk-delete", "PUT", events.map((e) => ({ external_id: e.external_id })));
-    await call("/events/bulk", "POST", events);
+    await icuCall("/events/bulk-delete", "PUT", events.map((e) => ({ external_id: e.external_id })));
+    await icuCall("/events/bulk", "POST", events);
     return events.length;
   }
 
@@ -848,13 +856,14 @@
     renderTemplate();
   }
 
+  const TABS = ["paces", "builder", "intervals"];
   function showTab(name) {
-    const isBuilder = name === "builder";
-    document.getElementById("tab-paces").setAttribute("aria-selected", String(!isBuilder));
-    document.getElementById("tab-builder").setAttribute("aria-selected", String(isBuilder));
-    document.getElementById("panel-paces").hidden = isBuilder;
-    document.getElementById("panel-builder").hidden = !isBuilder;
-    if (isBuilder && lastWeeks.length) renderVolumeChart(lastWeeks);
+    if (!TABS.includes(name) || (name === "intervals" && !PUSH_ENABLED)) name = "paces";
+    TABS.forEach((t) => {
+      document.getElementById(`tab-${t}`).setAttribute("aria-selected", String(t === name));
+      document.getElementById(`panel-${t}`).hidden = t !== name;
+    });
+    if (name === "builder" && lastWeeks.length) renderVolumeChart(lastWeeks);
   }
 
   function init() {
@@ -895,10 +904,9 @@
     document.getElementById("btn-print").addEventListener("click", () => window.print());
     document.getElementById("btn-csv").addEventListener("click", exportCSV);
 
-    const icuSection = document.getElementById("icu-settings");
     const pushAll = document.getElementById("btn-push-all");
     if (!PUSH_ENABLED) {
-      if (icuSection) icuSection.hidden = true;
+      document.getElementById("tab-intervals").hidden = true;
       if (pushAll) pushAll.hidden = true;
     } else {
       const keyEl = document.getElementById("icu-key");
@@ -912,6 +920,24 @@
       rememberEl.addEventListener("change", updateKey);
       athleteEl.addEventListener("input", () => { state.icuAthlete = athleteEl.value.trim(); save(); });
       pushAll.addEventListener("click", () => runPush(pushAll, lastWeeks.flatMap(weekEvents), "all 12 weeks"));
+
+      const checkBtn = document.getElementById("btn-icu-check");
+      const checkMsg = document.getElementById("icu-check-msg");
+      checkBtn.addEventListener("click", async () => {
+        checkMsg.classList.remove("error", "ok");
+        checkBtn.disabled = true;
+        checkMsg.textContent = "Checking…";
+        try {
+          const who = await icuCheck();
+          checkMsg.textContent = `Connected${who ? ` as ${who}` : ""}.`;
+          checkMsg.classList.add("ok");
+        } catch (e) {
+          checkMsg.textContent = e.message;
+          checkMsg.classList.add("error");
+        } finally {
+          checkBtn.disabled = false;
+        }
+      });
     }
 
     document.getElementById("plan").addEventListener("click", (e) => {
@@ -947,6 +973,7 @@
 
     document.getElementById("tab-paces").addEventListener("click", () => { location.hash = "paces"; showTab("paces"); });
     document.getElementById("tab-builder").addEventListener("click", () => { location.hash = "builder"; showTab("builder"); });
+    document.getElementById("tab-intervals").addEventListener("click", () => { location.hash = "intervals"; showTab("intervals"); });
     window.addEventListener("hashchange", () => showTab(location.hash.slice(1)));
     let resizeTimer;
     window.addEventListener("resize", () => {

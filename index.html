@@ -18,6 +18,7 @@
   <nav class="tabs wrap" role="tablist">
     <button class="tab" role="tab" id="tab-paces" aria-controls="panel-paces" aria-selected="true">Predicted Paces</button>
     <button class="tab" role="tab" id="tab-builder" aria-controls="panel-builder" aria-selected="false">12-Week Builder</button>
+    <button class="tab" role="tab" id="tab-intervals" aria-controls="panel-intervals" aria-selected="false">intervals.icu</button>
   </nav>
 
   <main class="wrap">
@@ -111,20 +112,6 @@
         <h3>Weekly template</h3>
         <div class="week-template" id="week-template"></div>
         <p class="note">Classic layout: 2–3 sub-threshold days with an easy day between each, plus one long easy run. Most of your weekly volume should be easy running.</p>
-
-        <div id="icu-settings">
-          <h3>Send to intervals.icu</h3>
-          <div class="form-grid">
-            <label>API key <span class="hint">intervals.icu → Settings → Developer</span>
-              <input id="icu-key" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your API key" />
-            </label>
-            <label>Athlete ID <span class="hint">optional, e.g. i12345</span>
-              <input id="icu-athlete" type="text" autocomplete="off" spellcheck="false" placeholder="Your own account" />
-            </label>
-            <label class="check"><input id="icu-remember" type="checkbox" /> Remember key on this device</label>
-          </div>
-          <p class="note">Workouts are sent with pace targets, then sync from intervals.icu to your watch (COROS, Garmin and others) if you've connected it there. Sending a day again replaces that day's planner workout instead of adding a duplicate. Your key is only sent to intervals.icu. If you don't tick "Remember", it's forgotten when you close the page.</p>
-        </div>
       </div>
 
       <div class="card">
@@ -153,6 +140,35 @@
 
       <div id="plan-warnings"></div>
       <div id="plan"></div>
+    </section>
+
+    <!-- ================= INTERVALS.ICU ================= -->
+    <section id="panel-intervals" role="tabpanel" aria-labelledby="tab-intervals" hidden>
+      <div class="card" id="icu-settings">
+        <h2>Connect intervals.icu</h2>
+        <p class="lead">Connect your intervals.icu account to send planned workouts from the 12-Week Builder. They then sync from intervals.icu to your watch (COROS, Garmin and others) if you've connected it there.</p>
+        <div class="form-grid">
+          <label>API key <span class="hint">intervals.icu → Settings → Developer</span>
+            <input id="icu-key" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your API key" />
+          </label>
+          <label>Athlete ID <span class="hint">optional, e.g. i12345</span>
+            <input id="icu-athlete" type="text" autocomplete="off" spellcheck="false" placeholder="Your own account" />
+          </label>
+          <label class="check"><input id="icu-remember" type="checkbox" /> Remember key on this device</label>
+        </div>
+        <div class="toolbar icu-actions">
+          <button id="btn-icu-check" class="btn">Check connection</button>
+          <span id="icu-check-msg" class="push-msg" role="status"></span>
+        </div>
+        <h3>How sending works</h3>
+        <ul class="steps">
+          <li>On the 12-Week Builder, use <strong>Send</strong> on a day, <strong>Send week</strong>, or <strong>Send all to intervals.icu</strong>.</li>
+          <li>Workouts arrive as structured runs with pace ranges: warm-up, reps with recoveries, cool-down.</li>
+          <li>Sending a day again replaces that day's planner workout instead of adding a duplicate.</li>
+          <li>Leave Athlete ID blank to use the account the API key belongs to.</li>
+        </ul>
+        <p class="note">Your key is only sent to intervals.icu. If you don't tick "Remember", it's forgotten when you close the page.</p>
+      </div>
     </section>
   </main>
 
