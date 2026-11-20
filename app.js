@@ -546,9 +546,19 @@
     return `M${x},${y + h}V${y + r}Q${x},${y} ${x + r},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h}Z`;
   }
 
+  /** Phase colour key for week index i: base, build, peak or trial. */
+  function phaseKey(i) {
+    if (i < 4) return "base";
+    if (i < 8) return "build";
+    if (i === 11 && (state.finalWeek === "race" || state.finalWeek === "test")) return "trial";
+    return "peak";
+  }
+
   function renderVolumeChart(weeks) {
     const host = document.getElementById("volume-chart");
     if (!host) return;
+    const trialLegend = document.getElementById("legend-trial");
+    if (trialLegend) trialLegend.hidden = phaseKey(11) !== "trial";
     const toUnit = (km) => (state.units === "mi" ? km / KM_PER_MI : km);
     const W = Math.max(host.clientWidth || 0, 300);
     const H = 230;
@@ -572,6 +582,7 @@
     if (Math.abs(vals[peakIdx] - peak) >= 1) labelled.add(peakIdx);
 
     let svg = `<svg xmlns="${SVG_NS}" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Weekly volume for weeks 1 to 12: ${vals.map((v) => Math.round(v)).join(", ")} ${unitDist()}">`;
+    svg += `<defs><pattern id="hatch-lighter" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)"><line class="hatch-line" x1="0" y1="0" x2="0" y2="6"/></pattern></defs>`;
     // grid + y labels
     for (let v = 0; v <= yMax + 1e-9; v += step) {
       const yy = Math.round(y(v)) + 0.5;
@@ -588,7 +599,9 @@
       const top = y(vals[i]);
       const h = M.top + ph - top;
       svg += `<rect class="hover-col" data-i="${i}" x="${M.left + i * band}" y="${M.top}" width="${band}" height="${ph}"/>`;
-      svg += `<path class="bar ${full(i) ? "bar-full" : "bar-light"}" d="${barPath(x, top, bw, h)}"/>`;
+      const d = barPath(x, top, bw, h);
+      svg += `<path class="bar ph-${phaseKey(i)}" d="${d}"/>`;
+      if (wk.deload) svg += `<path class="bar-hatch" d="${d}" fill="url(#hatch-lighter)"/>`;
       if (labelled.has(i)) {
         svg += `<text class="bar-label" x="${x + bw / 2}" y="${top - 5}" text-anchor="middle">${Math.round(vals[i])}</text>`;
       }
@@ -612,7 +625,7 @@
         change = `${pct > 0 ? "+" : ""}${pct}% vs last full week`;
       } else if (wk.deload) change = "Lighter week";
       else if (weeks.volume.weeks[i].taper) change = state.finalWeek === "race" ? "Taper + race" : "Time trial week";
-      tip.innerHTML = `<strong>Week ${wk.n}</strong> · ${wk.phase}<br>` +
+      tip.innerHTML = `<i class="sw ph-${phaseKey(i)}"></i> <strong>Week ${wk.n}</strong> · ${wk.phase}<br>` +
         `<span class="tip-val">${dist(wk.totalKm, 0)}</span>${change ? ` · ${change}` : ""}<br>` +
         `Sub-T ${dist(wk.subtKm, 0)}`;
       tip.hidden = false;
