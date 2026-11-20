@@ -210,6 +210,11 @@ table.data tr.pb-row td { font-weight: 700; }
 .chart .hover-col.on { fill: var(--hover-col); }
 .chart .hit { fill: transparent; cursor: default; outline: none; }
 .chart .hit:focus-visible { stroke: var(--accent); stroke-width: 2; }
+.volume-total { display: flex; flex-wrap: wrap; gap: 8px 32px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.stat { display: flex; flex-direction: column; min-width: 0; }
+.stat-label { font-size: .75rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.stat-value { font-size: 1.35rem; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text); }
+.stat-value small { font-size: .8rem; font-weight: 600; color: var(--muted); }
 .chart-tip {
   position: absolute; pointer-events: none; z-index: 2;
   background: var(--surface); color: var(--text); border: 1px solid var(--border);
