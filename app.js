@@ -9,6 +9,7 @@
   const KM_PER_MI = 1.609344;
   const STORAGE_KEY = "nsm-planner-v1";
   const MIN_EASY_KM = 3;
+  const STRIDES = "6 × 20s strides";
   const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
   const RACES = [
@@ -377,6 +378,14 @@
       const wv = repCounts(state.template, targetKm, p, fmt);
       const days = tmpl.map((t) => buildSession(t, w, wv, p, fmt, raceKm));
 
+      // Strides on the first easy run of the week.
+      const firstEasy = days.find((d) => d.type === "easy");
+      if (firstEasy) {
+        firstEasy.title = "Easy + strides";
+        firstEasy.strides = STRIDES;
+        firstEasy.detail = `${rangeOf(p.easy)}, then ${STRIDES}`;
+      }
+
       const longRun = days.find((d) => d.type === "longrun");
       if (longRun) longRun.km = Math.min(Math.max(targetKm * 0.22, 8), 32);
 
@@ -497,10 +506,12 @@
 
   /** Plain-text version of one day's workout, for pasting into a Strava description. */
   function workoutText(wk, d) {
-    const name = d.type === "easy" ? "Easy run" : d.title;
+    const name = d.type === "easy" ? (d.strides ? "Easy run + strides" : "Easy run") : d.title;
     const head = `${name} – Week ${wk.n} (${wk.phase})`;
     if (d.type === "easy" || d.type === "longrun") {
-      return [head, `${dist(d.km)} easy @ ${rangeOf(lastPaces.easy)}`].join("\n");
+      const lines = [head, `${dist(d.km)} easy @ ${rangeOf(lastPaces.easy)}`];
+      if (d.strides) lines.push(`Finish with ${d.strides}, fast but relaxed, full recovery between`);
+      return lines.join("\n");
     }
     const lines = [head];
     if (d.wu) lines.push(`Warm-up: ${dist(d.wu)} easy${d.wuExtra || ""}`);
