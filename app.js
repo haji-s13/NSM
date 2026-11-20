@@ -1123,6 +1123,264 @@
     }).catch(() => { /* stay without the connector */ });
   }
 
+  // ---------------------------------------------------------------- accounts and saved plans (Supabase)
+  // Hosted site only. Configured in config.js; without it the home page offers guest mode only.
+  const AUTH_CFG = window.NSM_CONFIG || {};
+  const AUTH_READY = PUSH_ENABLED && !!(AUTH_CFG.supabaseUrl && AUTH_CFG.supabaseAnonKey) &&
+    !!(window.supabase && typeof window.supabase.createClient === "function");
+  const ENTRY_KEY = "nsm-entry";
+  let sb = null;
+  let authUser = null;
+  let authMode = "signin";
+  let currentPlan = null; // { id, name } of the plan loaded or last saved
+  let planDeleteArm = null;
+
+  const $ = (id) => document.getElementById(id);
+  function setEntry(v) { try { if (v) localStorage.setItem(ENTRY_KEY, v); else localStorage.removeItem(ENTRY_KEY); } catch (e) { /* ignore */ } }
+  function getEntry() { try { return localStorage.getItem(ENTRY_KEY); } catch (e) { return null; } }
+
+  function showScreen(which) {
+    $("home").hidden = which !== "home";
+    $("app").hidden = which === "home";
+    if (which === "app") showTab(location.hash.slice(1));
+  }
+  const displayName = (u) => (u && ((u.user_metadata && u.user_metadata.display_name) || u.email)) || "";
+
+  function updateAuthUi() {
+    const chip = $("user-chip");
+    chip.hidden = !PUSH_ENABLED || !$("home").hidden;
+    $("user-name").textContent = authUser ? displayName(authUser) : "Guest";
+    $("btn-account").textContent = authUser ? "Sign out" : (AUTH_READY ? "Sign in" : "Home");
+    $("plans-card").hidden = !PUSH_ENABLED;
+    $("plans-signed-in").hidden = !authUser;
+    $("plans-guest").hidden = !!authUser;
+    $("btn-plans-signin").hidden = !AUTH_READY;
+    $("plan-current").textContent = currentPlan ? `Editing “${currentPlan.name}”` : "";
+    $("btn-plan-save").textContent = currentPlan ? "Save changes" : "Save plan";
+    $("btn-plan-new").hidden = !currentPlan;
+  }
+
+  function setAuthMode(mode) {
+    authMode = mode;
+    $("auth-tab-signin").setAttribute("aria-selected", String(mode === "signin"));
+    $("auth-tab-signup").setAttribute("aria-selected", String(mode === "signup"));
+    $("auth-name-row").hidden = mode !== "signup";
+    $("auth-submit").textContent = mode === "signup" ? "Create account" : "Sign in";
+    $("auth-password").setAttribute("autocomplete", mode === "signup" ? "new-password" : "current-password");
+    authMsg("");
+  }
+  function authMsg(text, isError) {
+    const el = $("auth-msg");
+    el.textContent = text;
+    el.classList.toggle("error", !!isError);
+  }
+
+  async function onAuthSubmit(e) {
+    e.preventDefault();
+    const email = $("auth-email").value.trim();
+    const password = $("auth-password").value;
+    const name = $("auth-name").value.trim();
+    if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return authMsg("Enter a valid email address.", true);
+    if (password.length < 8) return authMsg("Use a password of at least 8 characters.", true);
+    const btn = $("auth-submit");
+    btn.disabled = true;
+    authMsg(authMode === "signup" ? "Creating your account…" : "Signing in…");
+    try {
+      if (authMode === "signup") {
+        const { data, error } = await sb.auth.signUp({
+          email, password,
+          options: { data: { display_name: name || email.split("@")[0] }, emailRedirectTo: location.origin + location.pathname },
+        });
+        if (error) throw error;
+        if (!data.session) {
+          authMsg("Check your email and click the confirmation link, then sign in here.");
+          setAuthMode("signin");
+          authMsg("Check your email and click the confirmation link, then sign in here.");
+        }
+      } else {
+        const { error } = await sb.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+      }
+    } catch (err) {
+      const m = String((err && err.message) || "");
+      if (/invalid login/i.test(m)) authMsg("That email and password don't match an account.", true);
+      else if (/not confirmed/i.test(m)) authMsg("Confirm your email first: click the link we sent you, then sign in.", true);
+      else if (/already registered/i.test(m)) authMsg("That email already has an account. Sign in instead.", true);
+      else if (/fetch|network/i.test(m)) authMsg("Couldn't reach the account service. Check your connection and try again.", true);
+      else authMsg(m || "Something went wrong. Try again.", true);
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  function onSignedIn(user) {
+    authUser = user;
+    setEntry("account");
+    showScreen("app");
+    updateAuthUi();
+    loadPlanList();
+  }
+  function onSignedOut() {
+    authUser = null;
+    currentPlan = null;
+    setEntry(null);
+    $("plan-list").innerHTML = "";
+    showScreen("home");
+    updateAuthUi();
+  }
+
+  // ---- saved plans
+  function planMsg(text, isError) {
+    const el = $("plan-msg");
+    el.textContent = text;
+    el.classList.toggle("error", !!isError);
+  }
+  function planError(error) {
+    const m = String((error && error.message) || "");
+    if (/relation .*plans.* does not exist|could not find the table/i.test(m)) {
+      return "The plans table isn't set up yet. Run the SQL in SUPABASE_SETUP.md.";
+    }
+    if (/JWT|expired|not authenticated/i.test(m)) return "Your sign-in has expired. Sign out and sign in again.";
+    if (/fetch|network/i.test(m)) return "Couldn't reach your saved plans. Check your connection and try again.";
+    return m || "Something went wrong with your saved plans.";
+  }
+  const settingsSnapshot = () => JSON.parse(JSON.stringify(state));
+
+  async function loadPlanList() {
+    if (!sb || !authUser) return;
+    const list = $("plan-list");
+    list.innerHTML = `<li class="note">Loading your plans…</li>`;
+    const { data, error } = await sb.from("plans").select("id,name,updated_at").order("updated_at", { ascending: false });
+    if (error) { list.innerHTML = ""; planMsg(planError(error), true); return; }
+    if (!data.length) { list.innerHTML = `<li class="note">No saved plans yet. Set up a plan below, name it and click Save plan.</li>`; return; }
+    list.innerHTML = "";
+    data.forEach((p) => {
+      const li = document.createElement("li");
+      li.className = "plan-row" + (currentPlan && currentPlan.id === p.id ? " current" : "");
+      const meta = document.createElement("div");
+      const nm = document.createElement("strong");
+      nm.textContent = p.name;
+      const when = document.createElement("span");
+      when.className = "hint";
+      when.textContent = ` · saved ${new Date(p.updated_at).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}`;
+      meta.append(nm, when);
+      const actions = document.createElement("div");
+      actions.className = "plan-actions";
+      const load = document.createElement("button");
+      load.type = "button"; load.className = "copy-btn"; load.textContent = "Open";
+      load.addEventListener("click", () => openPlan(p.id));
+      const del = document.createElement("button");
+      del.type = "button"; del.className = "copy-btn"; del.textContent = "Delete";
+      del.addEventListener("click", () => deletePlan(p, del));
+      actions.append(load, del);
+      li.append(meta, actions);
+      list.appendChild(li);
+    });
+  }
+
+  async function savePlan(asNew) {
+    if (!sb || !authUser) return;
+    const name = $("plan-name").value.trim() || (currentPlan && !asNew ? currentPlan.name : "");
+    if (!name) { planMsg("Give the plan a name first.", true); $("plan-name").focus(); return; }
+    const btn = asNew ? $("btn-plan-new") : $("btn-plan-save");
+    btn.disabled = true;
+    planMsg("Saving…");
+    try {
+      if (currentPlan && !asNew) {
+        const { error } = await sb.from("plans")
+          .update({ name, settings: settingsSnapshot(), updated_at: new Date().toISOString() })
+          .eq("id", currentPlan.id);
+        if (error) throw error;
+        currentPlan = { id: currentPlan.id, name };
+      } else {
+        const { data, error } = await sb.from("plans").insert({ name, settings: settingsSnapshot() }).select("id").single();
+        if (error) throw error;
+        currentPlan = { id: data.id, name };
+      }
+      planMsg(`Saved “${name}”.`);
+      updateAuthUi();
+      loadPlanList();
+    } catch (e) {
+      planMsg(planError(e), true);
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  async function openPlan(id) {
+    planMsg("Opening…");
+    const { data, error } = await sb.from("plans").select("id,name,settings").eq("id", id).single();
+    if (error) { planMsg(planError(error), true); return; }
+    const saved = data.settings || {};
+    state = Object.assign({}, DEFAULTS, saved);
+    if (!Array.isArray(state.template) || state.template.length !== 7) state.template = DEFAULTS.template.slice();
+    save();
+    syncInputs();
+    renderAll();
+    currentPlan = { id: data.id, name: data.name };
+    $("plan-name").value = data.name;
+    planMsg(`Opened “${data.name}”. Changes aren't saved until you click Save changes.`);
+    updateAuthUi();
+    loadPlanList();
+  }
+
+  async function deletePlan(p, btn) {
+    if (planDeleteArm !== p.id) {
+      planDeleteArm = p.id;
+      btn.textContent = "Click to delete";
+      setTimeout(() => { if (planDeleteArm === p.id) { planDeleteArm = null; btn.textContent = "Delete"; } }, 4000);
+      return;
+    }
+    planDeleteArm = null;
+    const { error } = await sb.from("plans").delete().eq("id", p.id);
+    if (error) { planMsg(planError(error), true); return; }
+    if (currentPlan && currentPlan.id === p.id) { currentPlan = null; $("plan-name").value = ""; }
+    planMsg(`Deleted “${p.name}”.`);
+    updateAuthUi();
+    loadPlanList();
+  }
+
+  /** Decides between the home page and the app, and wires sign-in. */
+  async function initAuth() {
+    if (!PUSH_ENABLED) { showScreen("app"); updateAuthUi(); return; } // claude.ai preview: no accounts
+    $("auth-ready").hidden = !AUTH_READY;
+    $("auth-off").hidden = AUTH_READY;
+    $("btn-guest").addEventListener("click", () => { setEntry("guest"); showScreen("app"); updateAuthUi(); });
+    $("btn-account").addEventListener("click", async () => {
+      if (authUser && sb) { await sb.auth.signOut(); onSignedOut(); return; }
+      setEntry(null);
+      showScreen("home");
+      updateAuthUi();
+    });
+    $("btn-plans-signin").addEventListener("click", () => { showScreen("home"); updateAuthUi(); });
+    $("btn-plan-save").addEventListener("click", () => savePlan(false));
+    $("btn-plan-new").addEventListener("click", () => savePlan(true));
+    $("auth-tab-signin").addEventListener("click", () => setAuthMode("signin"));
+    $("auth-tab-signup").addEventListener("click", () => setAuthMode("signup"));
+    $("auth-form").addEventListener("submit", onAuthSubmit);
+
+    if (AUTH_READY) {
+      try {
+        sb = window.supabase.createClient(AUTH_CFG.supabaseUrl, AUTH_CFG.supabaseAnonKey, {
+          auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+        });
+        sb.auth.onAuthStateChange((event, session) => {
+          // Defer: supabase-js advises against awaiting its own calls inside this callback.
+          setTimeout(() => {
+            if (session && session.user && (!authUser || authUser.id !== session.user.id)) onSignedIn(session.user);
+            else if (!session && authUser) onSignedOut();
+          }, 0);
+        });
+        const { data } = await sb.auth.getSession();
+        if (data && data.session) { onSignedIn(data.session.user); return; }
+      } catch (e) {
+        sb = null;
+      }
+    }
+    showScreen(getEntry() === "guest" ? "app" : "home");
+    updateAuthUi();
+  }
+
   const weekEvents = (wk) => wk.days.map((d, i) => (d.type === "rest" ? null : icuEvent(wk, d, i))).filter(Boolean);
 
   /** Copies text inside a click handler; falls back to a hidden textarea. */
@@ -1535,6 +1793,7 @@
       corosSend(corosAllBtn, items, "all weeks");
     });
     initCoros();
+    initAuth();
 
     renderAll();
   }

@@ -1,6 +1,6 @@
 # Norwegian Singles Planner
 
-A static web app (plain HTML, CSS and JavaScript, no build step) with three tabs:
+A static web app (plain HTML, CSS and JavaScript, no build step). It opens on a home page where you sign in, create an account or continue as a guest, then has three tabs:
 
 1. **Predicted Paces** – enter a 5k or 10k PB to get their VDOT, predicted race times (Jack Daniels' VDOT formula) and training paces, each shown as a range:
    - Sub-T short (1k / 3 min reps): 15k → half marathon pace
@@ -28,7 +28,9 @@ A static web app (plain HTML, CSS and JavaScript, no build step) with three tabs
    - Print and CSV export
 3. **Connections** – COROS status, plus the intervals.icu API key, optional athlete ID and a Check connection button.
 
-Settings are saved in the browser's localStorage.
+Signed-in users can save named plans to their profile (**My plans** on the 12-Week Builder) and open them on any device. Accounts use Supabase: see [SUPABASE_SETUP.md](SUPABASE_SETUP.md) and fill in `config.js`. Without it, the site runs guest-only. Guest settings are saved in the browser's localStorage.
+
+The Supabase browser library is vendored in `vendor/` (supabase-js 2.118.0, MIT).
 
 ## Running
 
