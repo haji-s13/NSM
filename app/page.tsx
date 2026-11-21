@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useApp, type Screen } from "@/components/app-provider";
 import { SiteHeader } from "@/components/site-header";
 import { HomeScreen } from "@/components/home-screen";
+import { NewPasswordCard } from "@/components/auth/new-password-card";
 import { PacesScreen } from "@/components/paces/paces-screen";
 import { BuilderScreen } from "@/components/builder/builder-screen";
 import { CorosCard } from "@/components/connections/coros-card";
@@ -17,8 +18,9 @@ const NAV: { value: Screen; label: string; Icon: typeof Gauge }[] = [
 ];
 
 export default function Page() {
-  const { ready, entry, screen, setScreen } = useApp();
+  const { ready, entry, screen, setScreen, recovering } = useApp();
   if (!ready) return <div className="min-h-dvh bg-background" />;
+  if (recovering) return (<><SiteHeader showAccount={false} /><NewPasswordCard /></>);
   if (!entry) return (<><SiteHeader showAccount={false} /><HomeScreen /></>);
 
   return (

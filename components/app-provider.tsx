@@ -25,6 +25,8 @@ interface AppState {
   enterAsGuest: () => void;
   goHome: () => void;
   user: User | null;
+  recovering: boolean;            // opened a password-reset link
+  finishRecovery: () => void;
   signOut: () => Promise<void>;
   currentPlan: { id: string; name: string } | null;
   setCurrentPlan: (p: { id: string; name: string } | null) => void;
@@ -58,6 +60,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [screen, setScreenState] = useState<Screen>("paces");
   const [entry, setEntryState] = useState<Entry>(null);
   const [user, setUser] = useState<User | null>(null);
+  const [recovering, setRecovering] = useState(false);
   const [currentPlan, setCurrentPlan] = useState<{ id: string; name: string } | null>(null);
   const [coros, setCoros] = useState<AppState["coros"]>({ client: null, source: null, server: COROS_SERVER });
   const [sentVersion, setSentVersion] = useState(0);
@@ -70,6 +73,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // Load per-device state once in the browser.
   useEffect(() => {
+    // Opened from a password-reset email (we add ?reset=1 to its return address).
+    if (new URLSearchParams(location.search).get("reset") === "1" || /type=recovery/.test(location.hash)) setRecovering(true);
     setSettings(loadLocal());
     setScreenState(screenFromHash());
     setEntryState(readEntry());
@@ -97,8 +102,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const sb = supabase();
     if (!sb) return;
     sb.auth.getSession().then(({ data }) => { if (data.session) setUser(data.session.user); });
-    const { data: sub } = sb.auth.onAuthStateChange((_e, session) => {
+    const { data: sub } = sb.auth.onAuthStateChange((event, session) => {
       setTimeout(() => {
+        if (event === "PASSWORD_RECOVERY") setRecovering(true);
         setUser(session?.user ?? null);
         if (session?.user) { writeEntry("account"); setEntryState("account"); }
       }, 0);
@@ -126,6 +132,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     enterAsGuest: () => { writeEntry("guest"); setEntryState("guest"); },
     goHome: () => { writeEntry(null); setEntryState(null); },
     user,
+    recovering,
+    finishRecovery: () => { setRecovering(false); history.replaceState(null, "", location.pathname + "#paces"); setScreenState("paces"); },
     signOut: async () => {
       await supabase()?.auth.signOut();
       setUser(null); setCurrentPlan(null); writeEntry(null); setEntryState(null);

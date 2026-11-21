@@ -206,12 +206,15 @@ function storeTokens(cfg: DirectConfig, tok: Record<string, unknown>) {
 export async function corosHandleRedirect(): Promise<{ ok: boolean; message: string } | null> {
   const q = new URLSearchParams(location.search);
   if (!q.has("code") && !q.has("error")) return null;
+  // Only handle returns from a COROS sign-in we started (Supabase links use ?code= too).
   let pending: { verifier: string; state: string } | null = null;
-  try { pending = JSON.parse(localStorage.getItem(CD_PENDING) || "null"); localStorage.removeItem(CD_PENDING); } catch { /* ignore */ }
+  try { pending = JSON.parse(localStorage.getItem(CD_PENDING) || "null"); } catch { /* ignore */ }
+  if (!pending || !q.has("state")) return null;
+  try { localStorage.removeItem(CD_PENDING); } catch { /* ignore */ }
   history.replaceState(null, "", location.pathname + "#connections");
   if (q.has("error")) return { ok: false, message: `COROS sign-in didn't complete: ${q.get("error_description") || q.get("error")}.` };
   const cfg = load();
-  if (!pending || !cfg || pending.state !== q.get("state")) {
+  if (!cfg || pending.state !== q.get("state")) {
     return { ok: false, message: "COROS sign-in couldn't be verified. Try Connect COROS again." };
   }
   try {

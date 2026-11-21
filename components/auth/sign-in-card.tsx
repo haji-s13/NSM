@@ -14,6 +14,7 @@ import { authEnabled, supabase } from "@/lib/supabase";
 export function SignInCard() {
   const { enterAsGuest } = useApp();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [resetting, setResetting] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -56,6 +57,47 @@ export function SignInCard() {
     }
   }
 
+  async function sendReset(e: FormEvent) {
+    e.preventDefault();
+    const sb = supabase();
+    if (!sb) return;
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim())) return setMsg({ text: "Enter the email you signed up with.", error: true });
+    setBusy(true);
+    setMsg({ text: "Sending…" });
+    const { error } = await sb.auth.resetPasswordForEmail(email.trim(), { redirectTo: location.origin + location.pathname + "?reset=1" });
+    setBusy(false);
+    if (error && /rate|seconds|too many/i.test(error.message)) {
+      return setMsg({ text: "Too many requests. Wait a minute and try again.", error: true });
+    }
+    if (error && /fetch|network/i.test(error.message)) {
+      return setMsg({ text: "Couldn't reach the account service. Check your connection and try again.", error: true });
+    }
+    // Same message whether or not the email has an account, so addresses can't be probed.
+    setMsg({ text: "If that email has an account, a reset link is on its way. Open it on this device." });
+  }
+
+  if (resetting) {
+    return (
+      <Card className="gap-0 py-0">
+        <CardContent className="flex flex-col gap-4 p-6">
+          <div className="flex flex-col gap-2">
+            <h2 className="font-black">Reset your password</h2>
+            <p className="text-muted-foreground">Enter your account email and we&apos;ll send you a link to set a new password.</p>
+          </div>
+          <form onSubmit={sendReset} noValidate className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="reset-email">Email</Label>
+              <Input id="reset-email" type="email" inputMode="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
+            </div>
+            <Button type="submit" disabled={busy} className="w-full">Send reset link</Button>
+            <p role="status" className={msg?.error ? "font-black text-status-error" : "text-muted-foreground"}>{msg?.text}</p>
+          </form>
+          <Button variant="ghost" className="w-full" onClick={() => { setResetting(false); setMsg(null); }}>Back to sign in</Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card className="gap-0 py-0">
       <CardContent className="flex flex-col gap-4 p-6">
@@ -79,7 +121,15 @@ export function SignInCard() {
                 <Input id="auth-email" type="email" inputMode="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
               </div>
               <div className="flex flex-col gap-2">
-                <Label htmlFor="auth-password">Password</Label>
+                <div className="flex items-baseline justify-between gap-2">
+                  <Label htmlFor="auth-password">Password</Label>
+                  {mode === "signin" && (
+                    <button type="button" onClick={() => { setResetting(true); setMsg(null); }}
+                      className="min-h-10 text-primary underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-ring">
+                      Forgot password?
+                    </button>
+                  )}
+                </div>
                 <Input id="auth-password" type="password" autoComplete={mode === "signup" ? "new-password" : "current-password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 8 characters" />
               </div>
               <Button type="submit" disabled={busy} className="w-full">{mode === "signup" ? "Create account" : "Sign in"}</Button>
