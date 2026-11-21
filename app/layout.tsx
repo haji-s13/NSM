@@ -6,16 +6,16 @@ import { Toaster } from "@/components/ui/sonner";
 import { AppProvider } from "@/components/app-provider";
 
 export const metadata: Metadata = {
-  title: "Norwegian Singles Planner",
-  description: "Sub-threshold pace ranges from your 5k or 10k PB, a 12-week plan, and one-click sending to COROS or intervals.icu.",
+  title: "HYROX + Norwegian Singles Method",
+  description: "Sub-threshold run paces and a 12-week Norwegian Singles plan, plus a 12-week HYROX station program that targets your weak stations.",
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#1f3a68" },
-    { media: "(prefers-color-scheme: dark)", color: "#0f1216" },
+    { media: "(prefers-color-scheme: light)", color: "#0e1116" },
+    { media: "(prefers-color-scheme: dark)", color: "#08090b" },
   ],
 };
 

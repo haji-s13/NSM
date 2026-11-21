@@ -54,10 +54,10 @@ export function HyroxDayRow({ wk, i, onIcu, busy }: { wk: HxWeek; i: number; onI
         <>
           <div className="flex min-w-0 flex-col gap-1">
             {d.blocks.map((b, k) => (
-              <p key={k} className={cn("break-words", b.label === "Warm-up" ? "font-extralight text-muted-foreground" : b.weak ? "" : "font-black")}>
+              <p key={k} className={cn("break-words", b.label === "Warm-up" ? "font-extralight text-muted-foreground" : b.weak || b.acc ? "" : "font-black")}>
                 {b.label === "Warm-up" ? `Warm-up ${b.text}` : (
                   <>
-                    <span className={cn("mr-2 text-meta uppercase", b.weak ? "text-signal" : "text-muted-foreground")}>{b.weak ? "Weak · " + b.label.split("· ")[1] : b.label}</span>
+                    <span className={cn("mr-2 text-meta uppercase", b.weak ? "text-signal" : "text-muted-foreground")}>{b.weak ? "Weak · " + b.label.split("· ")[1] : b.acc ? "Accessory · " + b.label.split("· ")[1] : b.label}</span>
                     {b.text}
                   </>
                 )}

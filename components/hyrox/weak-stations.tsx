@@ -19,7 +19,7 @@ export function WeakStations() {
       <div className="flex flex-col gap-1">
         <h2 className="font-black">Weak stations</h2>
         <p className="max-w-[65ch] font-extralight text-muted-foreground">
-          Each one you pick gets more sets in its regular work and one extra block a week, matched to the phase: strength, then capacity, then race-specific.
+          Each one you pick gets more sets in its regular work, one extra station block a week matched to the phase (strength, then capacity, then race-specific), and gym work for the muscles it relies on, added to a strength day.
         </p>
       </div>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" role="group" aria-label="Weak stations">

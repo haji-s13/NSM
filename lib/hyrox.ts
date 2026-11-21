@@ -84,7 +84,7 @@ export const WEAK_FACTOR = { moderate: 1.25, high: 1.5 } as const;
 
 /* ---------- Plan shapes ---------- */
 
-export interface HxBlock { label: string; text: string; min: number; weak?: Station }
+export interface HxBlock { label: string; text: string; min: number; weak?: Station; acc?: Station }
 export interface HxDay {
   type: HxDayType;
   title: string;
@@ -196,8 +196,8 @@ function weakBlock(c: Ctx, st: Station): HxBlock | null {
     }
     case "push": {
       if (intent === "strength") {
-        n = c.n(light ? 4 : 6, st); c.add(st, 12 * n);
-        return { label, weak: st, min: n * 2, text: `Sled push E2MOM ${n} × 12 m from ${c.w(d.push)}, adding ${c.inc(5)} a round (finish ${c.w(d.push + 5 * (n - 1))} if form holds)` };
+        n = Math.min(6, c.n(light ? 3 : 4, st)); c.add(st, 20 * n);
+        return { label, weak: st, min: n * 3, text: `Heavy sled push E3MOM ${n} × 20 m from ${c.w(d.push + 20)}, adding ${c.inc(10)} a round (finish ${c.w(d.push + 20 + 10 * (n - 1))} if form holds)` };
       }
       if (intent === "capacity") { n = c.n(4, st); c.add(st, 25 * n); c.add("ski", 500 * n); return { label, weak: st, min: n * 5, text: `${n} × (500 m ski @ 2k pace + 25 m sled push @ ${c.w(d.push)}), rest 1:1. Break only at 5–6 m.` }; }
       n = c.n(4, st); c.add(st, 25 * n);
@@ -250,6 +250,25 @@ function weakBlock(c: Ctx, st: Station): HxBlock | null {
       return { label, weak: st, min: n * 3, text: `Max unbroken WB @ ${c.w(d.wb)}, rest 2 min, ${n} sets. Start conservative and build.` };
     }
   }
+}
+
+/** Gym work for the muscles each weak station leans on. Added to a strength day. */
+export const ACCESSORY: Record<Station, { day: "lower" | "upper"; muscles: string; work: (n: number) => string }> = {
+  ski: { day: "upper", muscles: "Lats, triceps and core", work: (n) => `straight-arm cable pulldown ${n} × 12, close-grip bench or dips ${n} × 8, cable crunch ${n} × 12` },
+  push: { day: "lower", muscles: "Quads, glutes and calves", work: (n) => `leg press or hack squat ${n} × 10, single-leg calf raise ${n} × 15 per leg, wall sit in sled-push position ${n} × 40 s` },
+  pull: { day: "upper", muscles: "Upper back, biceps and grip", work: (n) => `chest-supported row ${n} × 10, hammer curl ${n} × 10, towel or rope hang ${n} × max` },
+  bbj: { day: "lower", muscles: "Hips, chest and power", work: (n) => `box jump ${n} × 5, standing broad jump ${n} × 3, push-up ${n} × 12–15` },
+  row: { day: "upper", muscles: "Posterior chain and upper back", work: (n) => `Romanian deadlift ${n} × 8, seated cable row ${n} × 10, back extension ${n} × 12` },
+  farmers: { day: "upper", muscles: "Grip, traps and trunk", work: (n) => `suitcase carry ${n} × 20 m per side, barbell shrug ${n} × 12, plate pinch hold ${n} × 30 s` },
+  lunges: { day: "lower", muscles: "Quads, glutes and adductors", work: (n) => `deficit reverse lunge ${n} × 8 per leg, step-up ${n} × 10 per leg, Copenhagen plank ${n} × 20 s per side` },
+  wb: { day: "lower", muscles: "Quads, shoulders and core", work: (n) => `front squat ${n} × 6 @ 70%, push press ${n} × 6, thruster ${n} × 10 with the race ball` },
+};
+
+function accessoryBlock(spec: WeekSpec, st: Station): HxBlock | null {
+  if (spec.kind === "bench" || spec.kind === "test" || spec.kind === "race") return null;
+  const n = spec.kind === "strength" || spec.kind === "build" ? 3 : 2;
+  const a = ACCESSORY[st];
+  return { label: `Accessory · ${STATION[st].label}`, acc: st, min: n * 3, text: `${a.muscles}: ${a.work(n)}` };
 }
 
 /** Where each weak station's extra work goes, in order of preference. */
@@ -438,6 +457,15 @@ export function buildHyrox(h: HyroxSettings, startDate: string): HxPlan {
           days[host].blocks.push(b);
           const add = diff(c.vol, before);
           for (const k of Object.keys(add) as Station[]) days[host].vol[k] = (days[host].vol[k] || 0) + add[k]!;
+        }
+        // Muscle-specific gym work for each weak station, on its strength day (or the other one).
+        for (const st of h.weaknesses) {
+          const pref = ACCESSORY[st].day;
+          const accCount = (i: number) => days[i].blocks.filter((x) => x.acc).length;
+          const host = [pref, pref === "lower" ? "upper" : "lower"].map((s) => days.findIndex((d) => d.type === s))
+            .filter((i) => i >= 0).sort((a, b) => Number(accCount(a) >= 2) - Number(accCount(b) >= 2))[0];
+          const b = accessoryBlock(spec, st);
+          if (host !== undefined && b) days[host].blocks.push(b);
         }
       }
       for (const d of days) {

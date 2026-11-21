@@ -34,7 +34,7 @@ export default function Page() {
           <TabsList className="mx-auto grid h-16 w-full max-w-6xl grid-cols-4 rounded-none bg-transparent p-0 group-data-[orientation=horizontal]/tabs:h-16 md:flex md:h-12 md:justify-start md:gap-2 md:px-8 md:group-data-[orientation=horizontal]/tabs:h-12">
             {NAV.map(({ value, label, Icon }) => (
               <TabsTrigger key={value} value={value}
-                className="h-full flex-col gap-1 rounded-none border-0 text-meta uppercase data-[state=active]:bg-transparent data-[state=active]:text-primary md:flex-row md:gap-2 md:border-b-2 md:border-transparent md:px-4 md:text-body md:normal-case md:tracking-normal md:data-[state=active]:border-primary">
+                className="h-full flex-col gap-1 rounded-none border-0 text-meta uppercase data-[state=active]:bg-transparent data-[state=active]:text-signal md:flex-row md:gap-2 md:border-b-2 md:border-transparent md:px-4 md:text-body md:normal-case md:tracking-normal md:data-[state=active]:border-signal">
                 <Icon className="size-5 md:size-4" aria-hidden />{label}
               </TabsTrigger>
             ))}
