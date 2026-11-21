@@ -62,7 +62,7 @@ export function SignInCard() {
         {authEnabled ? (
           <>
             <Tabs value={mode} onValueChange={(v) => { setMode(v as "signin" | "signup"); setMsg(null); }}>
-              <TabsList className="grid h-12 w-full grid-cols-2 p-1">
+              <TabsList className="grid h-12 w-full grid-cols-2 p-1 group-data-[orientation=horizontal]/tabs:h-12">
                 <TabsTrigger value="signin" className="h-10">Sign in</TabsTrigger>
                 <TabsTrigger value="signup" className="h-10">Create account</TabsTrigger>
               </TabsList>
