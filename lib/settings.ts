@@ -1,4 +1,5 @@
 import { nextMonday, type Units } from "./format";
+import { defaultHyrox, normalizeHyrox, type HyroxSettings } from "./hyrox";
 
 export type SessionType = "rest" | "easy" | "short" | "medium" | "long" | "hills" | "longrun";
 export type RepFormat = "distance" | "time" | "mixed";
@@ -22,6 +23,8 @@ export interface Settings {
   deloads: boolean;
   template: SessionType[];
   icuAthlete?: string;
+  /** HYROX station program. Shares startDate with the run plan and saves with it. */
+  hyrox: HyroxSettings;
 }
 
 export const SESSION_LABELS: Record<SessionType, string> = {
@@ -53,6 +56,7 @@ export function defaultSettings(): Settings {
     finalWeek: "race",
     deloads: true,
     template: ["easy", "short", "easy", "medium", "easy", "long", "longrun"],
+    hyrox: defaultHyrox(),
   };
 }
 
@@ -61,6 +65,7 @@ export function normalizeSettings(raw: unknown): Settings {
   const d = defaultSettings();
   const s = { ...d, ...(raw && typeof raw === "object" ? raw : {}) } as Settings;
   if (!Array.isArray(s.template) || s.template.length !== 7) s.template = d.template.slice();
+  s.hyrox = normalizeHyrox(s.hyrox);
   return s;
 }
 

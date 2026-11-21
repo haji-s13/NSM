@@ -1,7 +1,7 @@
-# Norwegian Singles Planner
+# HYROX + Norwegian Singles Method
 
-Sub-threshold pace ranges from a 5k or 10k PB, a 12-week Norwegian Singles plan, and one-click
-sending to COROS or intervals.icu. Built with Next.js (App Router, static export), Tailwind CSS v4
+Sub-threshold pace ranges from a 5k or 10k PB, a 12-week Norwegian Singles run plan, a 12-week
+HYROX station program, and one-click sending to COROS or intervals.icu. Built with Next.js (App Router, static export), Tailwind CSS v4
 and shadcn/ui. Design rules are in [DESIGN.md](DESIGN.md).
 
 ## What it does
@@ -17,6 +17,11 @@ and shadcn/ui. Design rules are in [DESIGN.md](DESIGN.md).
   - Weekly volume chart by phase.
   - Copy (Strava text), CSV, and sending to intervals.icu or COROS per day, week or plan.
   - **My plans**: save, open and delete named plans on your profile (Supabase).
+- **HYROX**: a 12-week station and strength program (no running; that's the run plan), built from a coach's year of programming.
+  - Phases: benchmark and strength, station build, race specific, sharpen, race week (or tests), with absorb weeks 4 and 8.
+  - Box squat, bench and deadlift on the maintenance cycle (3×15 → 4×10 → 5×5) or off-season waves; other formats rotate week to week.
+  - Weak stations get more volume, an extra phase-matched block and muscle-specific accessory work.
+  - Shares the start date and saved plans with the run plan. Copy, CSV and intervals.icu (as strength workouts).
 - **Connect**: COROS (direct OAuth sign-in to the COROS MCP server, or the Claude NSM connector on claude.ai) and intervals.icu (API key).
 
 ## Develop

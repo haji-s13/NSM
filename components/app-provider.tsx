@@ -5,11 +5,12 @@ import type { User } from "@supabase/supabase-js";
 import { toast } from "sonner";
 import { buildModel, type Model } from "@/lib/vdot";
 import { buildPlan, type Plan } from "@/lib/plan";
+import { buildHyrox, type HxPlan, type HyroxSettings } from "@/lib/hyrox";
 import { loadLocal, normalizeSettings, saveLocal, type Settings } from "@/lib/settings";
 import { supabase } from "@/lib/supabase";
 import { COROS_SERVER, corosConnected, corosHandleRedirect, directCoros, type CorosClient } from "@/lib/coros";
 
-export type Screen = "paces" | "builder" | "connections";
+export type Screen = "paces" | "builder" | "hyrox" | "connections";
 type Entry = "guest" | "account" | null;
 
 interface AppState {
@@ -19,6 +20,8 @@ interface AppState {
   replaceSettings: (s: Settings) => void;
   model: Model | null;
   plan: Plan | null;
+  hyrox: HxPlan;
+  updateHyrox: (patch: Partial<HyroxSettings>) => void;
   screen: Screen;
   setScreen: (s: Screen) => void;
   entry: Entry;
@@ -50,6 +53,7 @@ const writeEntry = (v: Entry) => { try { if (v) localStorage.setItem(ENTRY_KEY, 
 function screenFromHash(): Screen {
   const h = typeof location === "undefined" ? "" : location.hash.slice(1);
   if (h === "builder") return "builder";
+  if (h === "hyrox") return "hyrox";
   if (h === "connections" || h === "intervals") return "connections";
   return "paces";
 }
@@ -115,6 +119,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const update = useCallback((patch: Partial<Settings>) => {
     setSettings((s) => { const n = { ...s, ...patch }; saveLocal(n); return n; });
   }, []);
+  const updateHyrox = useCallback((patch: Partial<HyroxSettings>) => {
+    setSettings((s) => { const n = { ...s, hyrox: { ...s.hyrox, ...patch } }; saveLocal(n); return n; });
+  }, []);
   const replaceSettings = useCallback((s: Settings) => { const n = normalizeSettings(s); saveLocal(n); setSettings(n); }, []);
 
   const setScreen = useCallback((s: Screen) => {
@@ -125,9 +132,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const model = useMemo(() => buildModel(settings.pbDistance, settings.pbTime, settings.paceAdjust), [settings.pbDistance, settings.pbTime, settings.paceAdjust]);
   const plan = useMemo(() => (model ? buildPlan(settings, model) : null), [settings, model]);
+  const hyrox = useMemo(() => buildHyrox(settings.hyrox, settings.startDate), [settings.hyrox, settings.startDate]);
 
   const value: AppState = {
-    ready, settings, update, replaceSettings, model, plan, screen, setScreen,
+    ready, settings, update, replaceSettings, model, plan, hyrox, updateHyrox, screen, setScreen,
     entry: user ? "account" : entry,
     enterAsGuest: () => { writeEntry("guest"); setEntryState("guest"); },
     goHome: () => { writeEntry(null); setEntryState(null); },

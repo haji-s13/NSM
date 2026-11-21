@@ -5,33 +5,37 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* ------------------------------------------------------------------ tokens
-   Layout concept: a phone-first training log. One dominant colour (Fjord blue)
-   and one signal colour (Flag red). Data colours live in their own set. */
+   Layout concept: a phone-first training log for HYROX + Norwegian Singles.
+   One dominant colour (Graphite) and one signal colour (Ember). The header and home
+   banner sit on a darker graphite "hero" surface. Data colours live in their own set. */
 :root {
   /* brand */
-  --primary: #1f3a68;            /* Fjord blue: dominant */
+  --primary: #14181f;            /* Graphite: dominant */
   --primary-foreground: #ffffff;
-  --signal: #b3261e;             /* Flag red: the one accent per screen */
+  --signal: #c2410c;             /* Ember: the one accent per screen */
   --signal-foreground: #ffffff;
-  --signal-soft: #fbeceb;
+  --signal-soft: #fdede4;
+  --hero: #0e1116;               /* header and home banner */
+  --hero-foreground: #f4f5f7;
+  --hero-muted: #a3abb7;
 
   /* neutrals, tinted toward the primary */
-  --background: #f5f6f8;
-  --foreground: #161a20;
+  --background: #f4f5f7;
+  --foreground: #12161c;
   --card: #ffffff;
-  --card-foreground: #161a20;
+  --card-foreground: #12161c;
   --popover: #ffffff;
-  --popover-foreground: #161a20;
-  --secondary: #eceff4;
-  --secondary-foreground: #1f3a68;
-  --muted: #eceff4;
-  --muted-foreground: #586170;
-  --accent: #eceff4;             /* shadcn hover surface, not a brand colour */
-  --accent-foreground: #161a20;
-  --destructive: #b3261e;
-  --border: #dde1e7;
-  --input: #d3d8df;
-  --ring: #1f3a68;
+  --popover-foreground: #12161c;
+  --secondary: #eceef1;
+  --secondary-foreground: #14181f;
+  --muted: #eceef1;
+  --muted-foreground: #5b6370;
+  --accent: #eceef1;             /* shadcn hover surface, not a brand colour */
+  --accent-foreground: #12161c;
+  --destructive: #b42318;
+  --border: #dfe2e7;
+  --input: #d3d7de;
+  --ring: #c2410c;
 
   /* data: session tints (+ ink for text on them) */
   --session-easy: #e8f2ea;  --session-easy-ink: #24572f;
@@ -57,27 +61,30 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not(.light) {
-    --primary: #8fb0e6;
-    --primary-foreground: #0d1726;
-    --signal: #ef6b62;
-    --signal-foreground: #1a0605;
-    --signal-soft: #3a1f1d;
-    --background: #0f1216;
-    --foreground: #e7eaee;
-    --card: #181c22;
-    --card-foreground: #e7eaee;
-    --popover: #1d222a;
-    --popover-foreground: #e7eaee;
-    --secondary: #232932;
-    --secondary-foreground: #c9d6ec;
-    --muted: #232932;
-    --muted-foreground: #9aa3ad;
-    --accent: #232932;
-    --accent-foreground: #e7eaee;
-    --destructive: #ef6b62;
-    --border: #2b313a;
-    --input: #353c46;
-    --ring: #8fb0e6;
+    --primary: #f1f3f5;
+    --primary-foreground: #0e1116;
+    --signal: #ff7a3d;
+    --signal-foreground: #1a0a03;
+    --signal-soft: #3a2014;
+    --hero: #08090b;
+    --hero-foreground: #f1f3f5;
+    --hero-muted: #8b939e;
+    --background: #0e1013;
+    --foreground: #e8eaed;
+    --card: #171a1f;
+    --card-foreground: #e8eaed;
+    --popover: #1c2026;
+    --popover-foreground: #e8eaed;
+    --secondary: #23272e;
+    --secondary-foreground: #e6e9ed;
+    --muted: #23272e;
+    --muted-foreground: #9aa1ab;
+    --accent: #23272e;
+    --accent-foreground: #e8eaed;
+    --destructive: #f97066;
+    --border: #2a2f37;
+    --input: #343a43;
+    --ring: #ff7a3d;
     --session-easy: #1c2f22;  --session-easy-ink: #9fd8ac;
     --session-subt: #36281a;  --session-subt-ink: #f3bd85;
     --session-long: #1b2638;  --session-long-ink: #a9c4ee;
@@ -118,6 +125,9 @@
   --color-signal: var(--signal);
   --color-signal-foreground: var(--signal-foreground);
   --color-signal-soft: var(--signal-soft);
+  --color-hero: var(--hero);
+  --color-hero-foreground: var(--hero-foreground);
+  --color-hero-muted: var(--hero-muted);
   --color-session-easy: var(--session-easy);
   --color-session-easy-ink: var(--session-easy-ink);
   --color-session-subt: var(--session-subt);

@@ -90,10 +90,11 @@ in the same file (there is no `tailwind.config.ts`). Components use the Tailwind
 
 | Token | Light | Dark | Role |
 |---|---|---|---|
-| `--primary` | `#1f3a68` Fjord blue | `#8fb0e6` | **Dominant.** Header band, primary buttons, active tab, links, chart axis emphasis |
-| `--primary-foreground` | `#ffffff` | `#0d1726` | Text on primary |
-| `--signal` | `#b3261e` Flag red | `#ef6b62` | **Single accent.** One thing per screen that needs attention: the VDOT figure, an eyebrow, an error |
-| `--signal-foreground` | `#ffffff` | `#1a0605` | Text on the signal colour |
+| `--primary` | `#14181f` Graphite | `#f1f3f5` | **Dominant.** Primary buttons, links, chart axis emphasis |
+| `--hero` | `#0e1116` | `#08090b` | Header band and home banner (with `--hero-foreground`, `--hero-muted`) |
+| `--primary-foreground` | `#ffffff` | `#0e1116` | Text on primary |
+| `--signal` | `#c2410c` Ember | `#ff7a3d` | **Single accent.** The active tab, the wordmark badge, an eyebrow, weak-station marks |
+| `--signal-foreground` | `#ffffff` | `#1a0a03` | Text on the signal colour |
 
 The brand accent is called `--signal` because shadcn/ui reserves `--accent` for neutral hover
 surfaces. `--accent` here is a neutral and never red. `--destructive` shares the signal value.
