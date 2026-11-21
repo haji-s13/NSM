@@ -1,47 +1,64 @@
 # Norwegian Singles Planner
 
-A static web app (plain HTML, CSS and JavaScript, no build step). It opens on a home page where you sign in, create an account or continue as a guest, then has three tabs:
+Sub-threshold pace ranges from a 5k or 10k PB, a 12-week Norwegian Singles plan, and one-click
+sending to COROS or intervals.icu. Built with Next.js (App Router, static export), Tailwind CSS v4
+and shadcn/ui. Design rules are in [DESIGN.md](DESIGN.md).
 
-1. **Predicted Paces** – enter a 5k or 10k PB to get their VDOT, predicted race times (Jack Daniels' VDOT formula) and training paces, each shown as a range:
-   - Sub-T short (1k / 3 min reps): 15k → half marathon pace
-   - Sub-T medium (2k / 6 min reps): half marathon → 25k pace
-   - Sub-T long (3k / 10 min reps): 25k → 30k pace
-   - 400s / hills: 10k → 15k pace
-   - Easy and long runs: Daniels E (62–74% VDOT)
-   - Reference rows: Daniels T (83–88% VDOT) and marathon pace
-   - An optional ± sec/km adjustment applies to all sub-T paces.
-2. **12-Week Builder** – choose a start date, starting and peak weekly volume, sub-T share of volume, rep format and a weekly template (which day gets which session). It generates 12 weeks with:
-   - Weekly volume that rises from the starting volume toward the peak by at most 5% a week
-   - Sub-T rep counts sized from each week's volume (the sub-T share split across the week's sessions), so sessions grow with volume
-   - Base (weeks 1–4), Build (5–8) and Peak (9–11) phases
-   - Optional lighter weeks in weeks 4 and 8
-   - Week 12 as a taper and race, a time trial, or a normal week
-   - Easy-run distances calculated to fill the weekly volume target
-   - Collapsible Plan settings (remembered per device) with a one-line summary when collapsed, and the weekly template in its own card
-   - Adjustable warm-up and cool-down distance for all sub-T sessions, shown as separate lines in each day's breakdown
-   - Estimated time for each workout and week (warm-up, reps, recoveries and cool-down at their paces)
-   - 6 × 20s strides added to the first easy run of each week
-   - A weekly volume bar chart coloured by phase (base, build, peak, race/trial), lighter weeks hatched, peak target line, hover for details, estimated hours per week under each bar, and 12-week total, weekly average, average weekly time and sub-T totals below it
-   - Send buttons (per day, per week, or all 12 weeks) that push workouts with pace targets to intervals.icu using the API key from the intervals.icu tab, from where they sync to COROS, Garmin and other watches. This needs the hosted version (GitHub Pages or a local server), not the single-file preview.
-   - COROS buttons (per day, per week, or all weeks) that add structured workouts with pace ranges to your COROS training schedule. On claude.ai they use the "Claude NSM" connector; on the hosted site, "Connect COROS" on the Connections tab signs in to the COROS MCP server directly (OAuth with PKCE, tokens kept in the browser).
-   - A Copy button on each day that copies a plain-text workout for a Strava description
-   - Print and CSV export
-3. **Connections** – COROS status, plus the intervals.icu API key, optional athlete ID and a Check connection button.
+## What it does
 
-Signed-in users can save named plans to their profile (**My plans** on the 12-Week Builder) and open them on any device. Accounts use Supabase: see [SUPABASE_SETUP.md](SUPABASE_SETUP.md) and fill in `config.js`. Without it, the site runs guest-only. Guest settings are saved in the browser's localStorage.
+- **Home**: sign in, create an account or continue as a guest.
+- **Paces**: VDOT from your PB (Jack Daniels' formula), race predictions, and training paces as ranges:
+  sub-T short (15k → half), medium (half → 25k), long (25k → 30k), 400s / hills, easy, and Daniels T for reference.
+- **Plan**:
+  - Weekly volume rises from the start volume toward the peak by at most 5% a week, with lighter weeks 4 and 8 and a taper or time trial in week 12.
+  - Sub-T rep counts are sized from each week's volume, with adjustable warm-up and cool-down.
+  - 6 × 20s strides on the first easy day of each week.
+  - Estimated time per workout and week.
+  - Weekly volume chart by phase.
+  - Copy (Strava text), CSV, and sending to intervals.icu or COROS per day, week or plan.
+  - **My plans**: save, open and delete named plans on your profile (Supabase).
+- **Connect**: COROS (direct OAuth sign-in to the COROS MCP server, or the Claude NSM connector on claude.ai) and intervals.icu (API key).
 
-The Supabase browser library is vendored in `vendor/` (supabase-js 2.118.0, MIT).
-
-## Running
-
-Open `index.html` in a browser, or serve the folder:
+## Develop
 
 ```sh
-python3 -m http.server 8000
+npm install
+NEXT_PUBLIC_BASE_PATH="" npm run dev     # http://localhost:3000
+npm run typecheck
 ```
 
-It can also be hosted as-is on GitHub Pages.
+## Build and deploy
 
-## Tuning
+`npm run build` writes a static site to `out/`. It's served under `/NSM` by default; set
+`NEXT_PUBLIC_BASE_PATH=""` to serve it from a root.
 
-The progression settings (`MAX_WEEKLY_INCREASE`, `REPS`, deload and taper factors) and pace definitions (in `model()`) are at the top of `app.js`.
+GitHub Pages deploys from `.github/workflows/deploy.yml` on every push to `main`. One-time
+setup: repo **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+
+## Accounts
+
+Supabase project details live in `lib/supabase.ts`. You can override them with
+`NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_KEY`. The publishable key is meant to be
+public: row-level security keeps each person's plans private. Setup steps and SQL are in
+[SUPABASE_SETUP.md](SUPABASE_SETUP.md).
+
+## Layout
+
+```
+app/            layout, page, fonts, globals.css (design tokens + Tailwind theme)
+components/ui/  shadcn/ui primitives
+components/     site-header, home-screen, app-provider, auth/, paces/, builder/, plans/, connections/
+lib/            vdot, plan, settings, format, workout-text, intervals, coros, supabase
+```
+
+## The previous static site (kept for rollback)
+
+`index.html`, `styles.css`, `app.js`, `config.js` and `vendor/` at the repo root are the previous
+plain HTML/CSS/JS version. They're kept on purpose so you can switch back at any time:
+
+- **Use the Next.js app:** Settings → Pages → Source: **GitHub Actions** (built by `deploy.yml`).
+- **Go back to the old site:** Settings → Pages → Source: **Deploy from a branch**, branch `main`,
+  folder `/ (root)`. GitHub then serves the root `index.html` again. The workflow keeps running on
+  pushes but doesn't change what's live while Pages is set to deploy from a branch.
+
+Both versions share saved settings in the browser and the same Supabase plans table.

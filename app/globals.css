@@ -1,0 +1,212 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* Dark mode follows the OS, or a .dark class on <html>. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ------------------------------------------------------------------ tokens
+   Layout concept: a phone-first training log. One dominant colour (Fjord blue)
+   and one signal colour (Flag red). Data colours live in their own set. */
+:root {
+  /* brand */
+  --primary: #1f3a68;            /* Fjord blue: dominant */
+  --primary-foreground: #ffffff;
+  --signal: #b3261e;             /* Flag red: the one accent per screen */
+  --signal-foreground: #ffffff;
+  --signal-soft: #fbeceb;
+
+  /* neutrals, tinted toward the primary */
+  --background: #f5f6f8;
+  --foreground: #161a20;
+  --card: #ffffff;
+  --card-foreground: #161a20;
+  --popover: #ffffff;
+  --popover-foreground: #161a20;
+  --secondary: #eceff4;
+  --secondary-foreground: #1f3a68;
+  --muted: #eceff4;
+  --muted-foreground: #586170;
+  --accent: #eceff4;             /* shadcn hover surface, not a brand colour */
+  --accent-foreground: #161a20;
+  --destructive: #b3261e;
+  --border: #dde1e7;
+  --input: #d3d8df;
+  --ring: #1f3a68;
+
+  /* data: session tints (+ ink for text on them) */
+  --session-easy: #e8f2ea;  --session-easy-ink: #24572f;
+  --session-subt: #fdeedd;  --session-subt-ink: #8a4a0b;
+  --session-long: #e6eef9;  --session-long-ink: #1f3a68;
+  --session-rest: #eff1f4;  --session-rest-ink: #586170;
+  --session-race: #fbe3e1;  --session-race-ink: #b3261e;
+
+  /* data: training phases (validated colour-blind safe) */
+  --phase-base: #2a78d6;
+  --phase-build: #eb6834;
+  --phase-peak: #1baf7a;
+  --phase-trial: #eda100;
+  --chart-grid: #e3e7ec;
+
+  /* status */
+  --status-ok: #1f7a3a;
+  --status-error: #b3261e;
+
+  --radius: 8px;
+  --shadow-float: 0 8px 24px rgb(16 24 40 / 0.18);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) {
+    --primary: #8fb0e6;
+    --primary-foreground: #0d1726;
+    --signal: #ef6b62;
+    --signal-foreground: #1a0605;
+    --signal-soft: #3a1f1d;
+    --background: #0f1216;
+    --foreground: #e7eaee;
+    --card: #181c22;
+    --card-foreground: #e7eaee;
+    --popover: #1d222a;
+    --popover-foreground: #e7eaee;
+    --secondary: #232932;
+    --secondary-foreground: #c9d6ec;
+    --muted: #232932;
+    --muted-foreground: #9aa3ad;
+    --accent: #232932;
+    --accent-foreground: #e7eaee;
+    --destructive: #ef6b62;
+    --border: #2b313a;
+    --input: #353c46;
+    --ring: #8fb0e6;
+    --session-easy: #1c2f22;  --session-easy-ink: #9fd8ac;
+    --session-subt: #36281a;  --session-subt-ink: #f3bd85;
+    --session-long: #1b2638;  --session-long-ink: #a9c4ee;
+    --session-rest: #20252c;  --session-rest-ink: #9aa3ad;
+    --session-race: #3d2220;  --session-race-ink: #ef6b62;
+    --phase-base: #3987e5;
+    --phase-build: #d95926;
+    --phase-peak: #199e70;
+    --phase-trial: #c98500;
+    --chart-grid: #2a3038;
+    --status-ok: #7fd396;
+    --status-error: #ef6b62;
+    --shadow-float: 0 8px 24px rgb(0 0 0 / 0.5);
+    color-scheme: dark;
+  }
+}
+
+/* ------------------------------------------------------------------ tailwind theme */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-signal: var(--signal);
+  --color-signal-foreground: var(--signal-foreground);
+  --color-signal-soft: var(--signal-soft);
+  --color-session-easy: var(--session-easy);
+  --color-session-easy-ink: var(--session-easy-ink);
+  --color-session-subt: var(--session-subt);
+  --color-session-subt-ink: var(--session-subt-ink);
+  --color-session-long: var(--session-long);
+  --color-session-long-ink: var(--session-long-ink);
+  --color-session-rest: var(--session-rest);
+  --color-session-rest-ink: var(--session-rest-ink);
+  --color-session-race: var(--session-race);
+  --color-session-race-ink: var(--session-race-ink);
+  --color-phase-base: var(--phase-base);
+  --color-phase-build: var(--phase-build);
+  --color-phase-peak: var(--phase-peak);
+  --color-phase-trial: var(--phase-trial);
+  --color-status-ok: var(--status-ok);
+  --color-status-error: var(--status-error);
+  --color-chart-1: var(--phase-base);
+  --color-chart-2: var(--phase-build);
+  --color-chart-3: var(--phase-peak);
+  --color-chart-4: var(--phase-trial);
+
+  --font-display: var(--font-display), "Helvetica Neue", sans-serif;
+  --font-sans: var(--font-body), "Helvetica Neue", sans-serif;
+  --font-mono: var(--font-mono), ui-monospace, "SFMono-Regular", Menlo, monospace;
+
+  /* DESIGN.md type scale: 12 / 16 / 48 / 144, weights 200 / 400 / 800 */
+  --text-meta: 0.75rem;
+  --text-meta--line-height: 1rem;
+  --text-meta--letter-spacing: 0.08em;
+  --text-meta--font-weight: 800;
+  --text-body: 1rem;
+  --text-body--line-height: 1.5rem;
+  --text-display: 3rem;
+  --text-display--line-height: 3.5rem;
+  --text-display--font-weight: 800;
+  --text-hero: 9rem;
+  --text-hero--line-height: 9rem;
+  --text-hero--font-weight: 200;
+
+  /* Map shadcn's in-between weights onto the 400 / 800 extremes. */
+  --font-weight-thin: 200;
+  --font-weight-extralight: 200;
+  --font-weight-light: 200;
+  --font-weight-normal: 400;
+  --font-weight-medium: 400;
+  --font-weight-semibold: 800;
+  --font-weight-bold: 800;
+  --font-weight-extrabold: 800;
+  --font-weight-black: 800;
+
+  /* One radius (8px) for every control and card; pills stay rounded-full. */
+  --radius-xs: var(--radius);
+  --radius-sm: var(--radius);
+  --radius-md: var(--radius);
+  --radius-lg: var(--radius);
+  --radius-xl: var(--radius);
+  --radius-2xl: var(--radius);
+
+  /* No faint shadows: separation comes from borders. Floating layers get one shadow. */
+  --shadow-2xs: none;
+  --shadow-xs: none;
+  --shadow-sm: none;
+  --shadow: none;
+  --shadow-md: var(--shadow-float);
+  --shadow-lg: var(--shadow-float);
+  --shadow-xl: var(--shadow-float);
+  --shadow-2xl: var(--shadow-float);
+}
+
+/* ------------------------------------------------------------------ base */
+@layer base {
+  * { @apply border-border outline-ring/50; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    @apply bg-background text-foreground font-sans text-body antialiased;
+    min-height: 100dvh;
+  }
+  h1, h2, h3 { text-wrap: balance; }
+  [hidden] { display: none !important; }
+  .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+@media print {
+  .no-print { display: none !important; }
+}
+
+/* Lighter-week swatch: the one allowed gradient (matches the chart hatch). */
+.hatch { background: repeating-linear-gradient(45deg, var(--muted-foreground) 0 2px, transparent 2px 5px); }
