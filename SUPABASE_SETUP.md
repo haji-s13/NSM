@@ -30,9 +30,14 @@ create policy "Edit own plans"   on public.plans for update using (auth.uid() = 
 create policy "Delete own plans" on public.plans for delete using (auth.uid() = user_id);
 
 create index if not exists plans_user_updated on public.plans (user_id, updated_at desc);
+
+-- Let signed-in users use the table through the API (row-level security still limits them to their own rows).
+grant select, insert, update, delete on public.plans to authenticated;
 ```
 
-Row-level security means each signed-in person can only see and change their own plans.
+Row-level security means each signed-in person can only see and change their own plans. Visitors who aren't signed in get no access at all.
+
+If you created the table before the `grant` line was added to this guide, run just that line on its own.
 
 ## 3. Set the site address
 
