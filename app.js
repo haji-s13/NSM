@@ -1240,6 +1240,9 @@
     if (/relation .*plans.* does not exist|could not find the table/i.test(m)) {
       return "The plans table isn't set up yet. Run the SQL in SUPABASE_SETUP.md.";
     }
+    if (/permission denied for table plans/i.test(m)) {
+      return "Your account can't use the plans table yet. Run the grant line from SUPABASE_SETUP.md in Supabase's SQL Editor.";
+    }
     if (/JWT|expired|not authenticated/i.test(m)) return "Your sign-in has expired. Sign out and sign in again.";
     if (/fetch|network/i.test(m)) return "Couldn't reach your saved plans. Check your connection and try again.";
     return m || "Something went wrong with your saved plans.";
@@ -1361,7 +1364,9 @@
 
     if (AUTH_READY) {
       try {
-        sb = window.supabase.createClient(AUTH_CFG.supabaseUrl, AUTH_CFG.supabaseAnonKey, {
+        // Accept a pasted REST URL too: the client needs the project's base address.
+        const baseUrl = String(AUTH_CFG.supabaseUrl).trim().replace(/\/+$/, "").replace(/\/(rest|auth)\/v1$/, "");
+        sb = window.supabase.createClient(baseUrl, AUTH_CFG.supabaseAnonKey, {
           auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
         });
         sb.auth.onAuthStateChange((event, session) => {
