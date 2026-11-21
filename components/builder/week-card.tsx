@@ -35,11 +35,6 @@ export function WeekCard({ wk, weeks }: { wk: Week; weeks: Week[] }) {
           <span className="font-black">Week {wk.n}</span>
           <span className="font-extralight text-muted-foreground">{fmtShortDate(wk.weekStart)} · {wk.phase}{wk.deload ? " · lighter" : ""}</span>
         </span>
-        <span className="num flex items-baseline gap-4">
-          <span className="font-black">{dist(wk.totalKm, u, 0)}</span>
-          <span className="text-muted-foreground">~{fmtDuration(wk.totalSec)}</span>
-          {change !== null && <span className="hidden text-muted-foreground sm:inline">{change > 0 ? "+" : ""}{change}%</span>}
-        </span>
       </button>
       {open && (
         <div className="border-t">
@@ -48,7 +43,7 @@ export function WeekCard({ wk, weeks }: { wk: Week; weeks: Week[] }) {
             <div className="min-w-0">
               <p className="text-meta uppercase text-muted-foreground">Week total</p>
               <p className="num font-extralight text-muted-foreground">
-                {dist(wk.totalKm, u, 0)} · ~{fmtDuration(wk.totalSec)} · Sub-T {dist(wk.subtKm, u, 0)} ({Math.round((wk.subtKm / wk.totalKm) * 100)}%) · {wk.fmt === "time" ? "time reps" : "distance reps"}
+                <span className="font-black text-foreground">{dist(wk.totalKm, u, 0)}</span> · ~{fmtDuration(wk.totalSec)}{change !== null ? ` · ${change > 0 ? "+" : ""}${change}% vs last full week` : ""} · Sub-T {dist(wk.subtKm, u, 0)} ({Math.round((wk.subtKm / wk.totalKm) * 100)}%) · {wk.fmt === "time" ? "time reps" : "distance reps"}
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
