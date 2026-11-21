@@ -15,7 +15,7 @@ import { dist, isoDate } from "@/lib/format";
 import { dayDate, MIN_EASY_KM } from "@/lib/plan";
 import { templateWarnings, DAYS } from "@/lib/settings";
 import { PlanSettings } from "./plan-settings";
-import { WeekTemplate } from "./week-template";
+import { WeekTemplateCard } from "./week-template";
 import { VolumeChart } from "./volume-chart";
 import { WeekCard } from "./week-card";
 import { useSend } from "./use-send";
@@ -56,11 +56,7 @@ export function BuilderScreen() {
       <MyPlans />
       <PlanSettings />
 
-      <section className="flex flex-col gap-4 rounded-lg border bg-card p-4 md:p-6">
-        <h2 className="font-black">Weekly template</h2>
-        <WeekTemplate />
-        <p className="font-extralight text-muted-foreground">Put an easy day between sub-threshold sessions. Most of your volume should be easy running.</p>
-      </section>
+      <WeekTemplateCard />
 
       {warns.map((w) => <Alert key={w} variant="destructive"><AlertDescription>{w}</AlertDescription></Alert>)}
 
