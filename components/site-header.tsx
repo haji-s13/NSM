@@ -8,11 +8,11 @@ import { authEnabled } from "@/lib/supabase";
 export function Wordmark() {
   return (
     <span className="flex min-w-0 items-center gap-2">
-      <span className="flex h-9 w-11 shrink-0 items-center justify-center rounded-md bg-signal font-display text-[0.9375rem] leading-none tracking-tight font-black text-signal-foreground" aria-hidden>
+      <span className="flex h-9 w-10 shrink-0 items-center justify-center rounded-md bg-signal font-display text-[0.9375rem] leading-none tracking-tight font-black text-signal-foreground" aria-hidden>
         H<span className="font-extralight">/</span>N
       </span>
       <span className="flex min-w-0 flex-col">
-        <span className="truncate font-display text-[1.125rem] leading-6 font-black tracking-tight md:text-[1.25rem]">
+        <span className="truncate font-display text-[0.9375rem] leading-6 font-black tracking-tight sm:text-[1.125rem] md:text-[1.25rem]">
           HYROX <span className="font-extralight text-signal">+</span> Norwegian Singles
         </span>
         <span className="text-meta uppercase text-hero-muted">Method · Training planner</span>
@@ -40,7 +40,7 @@ export function SiteHeader({ showAccount = true }: { showAccount?: boolean }) {
             <button
               type="button"
               onClick={() => (user ? signOut() : goHome())}
-              className="inline-flex h-10 items-center gap-2 rounded-full border border-hero-muted/40 px-4 text-hero-foreground hover:bg-hero-foreground/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hero-foreground"
+              className="inline-flex h-10 items-center gap-2 rounded-full border border-hero-muted/40 px-3 sm:px-4 text-hero-foreground hover:bg-hero-foreground/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hero-foreground"
             >
               {user ? <><LogOut className="size-4" aria-hidden /> Sign out</> : authEnabled ? "Sign in" : "Home"}
             </button>

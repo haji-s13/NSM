@@ -1,7 +1,7 @@
 import { SignInCard } from "@/components/auth/sign-in-card";
 
 const FEATURES: [string, string][] = [
-  ["Paces", "15k, half and 30k bands from your VDOT"],
+  ["Profile", "Your PB, paces and season: dates, races and time off"],
   ["Run plan", "Your dates, in 4-week blocks: base, build, peak, 5% a week at most"],
   ["HYROX", "Station blocks with extra work on your weak ones"],
   ["One season", "Pick start and end, add races and time off; each race gets a taper"],

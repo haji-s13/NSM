@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarRange, Dumbbell, Gauge, Link2 } from "lucide-react";
+import { CalendarRange, Dumbbell, Link2, UserRound } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useApp, type Screen } from "@/components/app-provider";
 import { SiteHeader } from "@/components/site-header";
@@ -12,8 +12,8 @@ import { HyroxScreen } from "@/components/hyrox/hyrox-screen";
 import { CorosCard } from "@/components/connections/coros-card";
 import { IntervalsCard } from "@/components/connections/intervals-card";
 
-const NAV: { value: Screen; label: string; Icon: typeof Gauge }[] = [
-  { value: "paces", label: "Paces", Icon: Gauge },
+const NAV: { value: Screen; label: string; Icon: typeof UserRound }[] = [
+  { value: "paces", label: "Profile", Icon: UserRound },
   { value: "builder", label: "Run", Icon: CalendarRange },
   { value: "hyrox", label: "HYROX", Icon: Dumbbell },
   { value: "connections", label: "Connect", Icon: Link2 },

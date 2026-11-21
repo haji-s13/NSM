@@ -5,7 +5,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useApp } from "@/components/app-provider";
 import { MyPlans } from "@/components/plans/my-plans";
-import { SeasonCard } from "@/components/plans/season-card";
 import { BlockHeading } from "@/components/plans/block-heading";
 import { hxCsv, linkWarnings } from "@/lib/hyrox";
 import { DAYS, QUALITY } from "@/lib/settings";
@@ -39,12 +38,11 @@ export function HyroxScreen() {
       <section className="flex flex-col gap-2">
         <h1 className="font-display text-[2rem] leading-10 font-black md:text-display">HYROX stations</h1>
         <p className="max-w-[65ch] text-muted-foreground">
-          {hyrox.weeks.length} weeks of station and strength work in {hyrox.blocks.length} blocks: strength, station build, then race specific, with absorb weeks and a taper before each race. Running stays in your run plan, on the same dates.
+          {hyrox.weeks.length} weeks of station and strength work in {hyrox.blocks.length} blocks: strength, station build, then race specific, with absorb weeks and a taper before each race. Running stays in your run plan, on the same dates. Set dates, races and time off on Profile.
         </p>
       </section>
 
       <MyPlans />
-      <SeasonCard />
       <HyroxSettingsCard />
       <WeakStations />
       <HyroxTemplateCard />

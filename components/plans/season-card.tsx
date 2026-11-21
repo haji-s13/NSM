@@ -46,7 +46,7 @@ export function SeasonCard() {
       </CollapsibleTrigger>
       <CollapsibleContent className="flex flex-col gap-6 border-t p-4 md:p-6">
         <p className="max-w-[65ch] font-extralight text-muted-foreground">
-          Shared by the run plan and the HYROX plan. Weeks run Monday to Sunday in blocks of {BLOCK_WEEKS}: base, then build, then peak. Each race gets a taper week before it and a race week.
+          Shared by the run plan and the HYROX plan, and saved with them. Weeks run Monday to Sunday in blocks of {BLOCK_WEEKS}: base, then build, then peak. Each race gets a taper week before it and a race week.
         </p>
 
         <div className="grid grid-cols-2 gap-4 md:max-w-xl">

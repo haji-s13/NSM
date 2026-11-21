@@ -6,6 +6,7 @@ import { ChartContainer, ChartTooltip, type ChartConfig } from "@/components/ui/
 import { useApp } from "@/components/app-provider";
 import { KM_PER_MI, dist, fmtDuration, unitDist } from "@/lib/format";
 import { changeVsLastFull, type Week } from "@/lib/plan";
+import { useChartWindow } from "@/components/plans/chart-window";
 
 const config = {
   base: { label: "Base", color: "var(--phase-base)" },
@@ -33,19 +34,21 @@ export function VolumeChart() {
     mq.addEventListener("change", on);
     return () => mq.removeEventListener("change", on);
   }, []);
+  const win = useChartWindow(plan?.weeks ?? []);
   if (!plan) return null;
   const u = settings.units;
   const toU = (km: number) => (u === "mi" ? km / KM_PER_MI : km);
-  const rows: Row[] = plan.weeks.map((wk, index) => ({
+  const shown = plan.weeks.slice(win.start, win.end);
+  const rows: Row[] = shown.map((wk, j) => ({ index: win.start + j,
     label: `W${wk.n}`, value: Math.round(toU(wk.totalKm) * 10) / 10,
-    hours: (wk.totalSec / 3600).toFixed(1), wk, index,
+    hours: (wk.totalSec / 3600).toFixed(1), wk,
   }));
   const peak = Math.round(toU(plan.peakKm));
-  const total = plan.weeks.reduce((t, w) => t + w.totalKm, 0);
-  const subt = plan.weeks.reduce((t, w) => t + w.subtKm, 0);
-  const time = plan.weeks.reduce((t, w) => t + w.totalSec, 0);
-  const showTrial = plan.weeks.some((w) => w.phaseKey === "trial");
-  const n = plan.weeks.length;
+  const total = shown.reduce((t, w) => t + w.totalKm, 0);
+  const subt = shown.reduce((t, w) => t + w.subtKm, 0);
+  const time = shown.reduce((t, w) => t + w.totalSec, 0);
+  const showTrial = shown.some((w) => w.phaseKey === "trial");
+  const n = shown.length;
 
   return (
     <div className="flex flex-col gap-4">
@@ -59,6 +62,7 @@ export function VolumeChart() {
         <li className="flex items-center gap-2"><span className="w-4 border-t-2 border-dashed border-muted-foreground" aria-hidden />Peak target</li>
       </ul>
 
+      {win.controls}
       {narrow && <p className="-mb-2 text-meta uppercase text-muted-foreground">Week · hours under each bar</p>}
       <ChartContainer config={config} className="aspect-auto h-64 w-full md:h-72">
         <BarChart data={rows} margin={{ top: 24, right: 8, left: -16, bottom: 0 }} accessibilityLayer>
@@ -72,7 +76,7 @@ export function VolumeChart() {
           <XAxis dataKey="label" tickLine={false} axisLine={false} interval={0} height={40}
             tick={({ x, y, payload, index }) => (
               <g transform={`translate(${x},${y})`}>
-                <text dy={12} textAnchor="middle" className="fill-muted-foreground text-meta">{narrow ? index + 1 : payload.value}</text>
+                <text dy={12} textAnchor="middle" className="fill-muted-foreground text-meta">{narrow ? rows[index]?.wk.n : payload.value}</text>
                 <text dy={28} textAnchor="middle" className="num fill-muted-foreground" fontSize={narrow ? 9 : 11}>{rows[index]?.hours}{narrow ? "" : "h"}</text>
               </g>
             )} />
