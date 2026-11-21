@@ -43,10 +43,14 @@ export function WeekCard({ wk, weeks }: { wk: Week; weeks: Week[] }) {
       </button>
       {open && (
         <div className="border-t">
-          <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2">
-            <p className="num font-extralight text-muted-foreground">
-              Sub-T {dist(wk.subtKm, u, 0)} ({Math.round((wk.subtKm / wk.totalKm) * 100)}%) · {wk.fmt === "time" ? "time reps" : "distance reps"}
-            </p>
+          {/* Week-level summary and actions, set apart from the days below. */}
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b-2 border-border bg-muted px-4 py-2 md:px-6">
+            <div className="min-w-0">
+              <p className="text-meta uppercase text-muted-foreground">Week total</p>
+              <p className="num font-extralight text-muted-foreground">
+                {dist(wk.totalKm, u, 0)} · ~{fmtDuration(wk.totalSec)} · Sub-T {dist(wk.subtKm, u, 0)} ({Math.round((wk.subtKm / wk.totalKm) * 100)}%) · {wk.fmt === "time" ? "time reps" : "distance reps"}
+              </p>
+            </div>
             <div className="flex flex-wrap gap-2">
               <Button size="sm" variant="ghost" disabled={busy === `week-${wk.n}-icu`} onClick={() => sendIcu(`week-${wk.n}-icu`, icuItems, `week ${wk.n}`)}>
                 <Send aria-hidden /> Week to icu
