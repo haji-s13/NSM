@@ -116,9 +116,13 @@ export const hxDayDate = (wk: HxWeek, i: number) => {
 
 /* ---------- Periodisation ---------- */
 
-interface WeekSpec { phase: string; phaseKey: HxWeek["phaseKey"]; kind: HxKind; light: boolean; step: number; vol: number }
+interface WeekSpec { w: number; phase: string; phaseKey: HxWeek["phaseKey"]; kind: HxKind; light: boolean; step: number; vol: number }
 
 function weekSpec(w: number, h: HyroxSettings): WeekSpec {
+  return { ...weekSpecBase(w, h), w } as WeekSpec;
+}
+
+function weekSpecBase(w: number, h: HyroxSettings): Omit<WeekSpec, "w"> {
   if (w === 0 && h.benchmarks) return { phase: "Benchmark", phaseKey: "base", kind: "bench", light: false, step: 0, vol: 0.8 };
   if (w <= 2) return { phase: "Strength", phaseKey: "base", kind: "strength", light: false, step: w, vol: [0.9, 1, 1.1][w] };
   if (w === 3) return h.deloads
@@ -166,17 +170,6 @@ class Ctx {
 }
 
 const WARMUP: HxBlock = { label: "Warm-up", text: "10 min easy bike + mobility", min: 10 };
-
-/** Squat, bench and deadlift prescriptions: maintenance cycle in season, strength waves off season. */
-function lift(c: Ctx, lift: string): string {
-  const { kind, step } = c.spec;
-  const waves = ["65/75/85% × 5, 5, 5+", "70/80/90% × 3, 3, 3+", "75/85/95% × 5, 3, 1+"];
-  const maint = ["3 × 15 @ 45–65%", "4 × 10 @ 50–70%", "5 × 5 @ 60–80%"];
-  if (kind === "absorb") return c.h.strength === "build" ? `${lift} 40/50/60% × 5` : `${lift} 3 × 8 @ 45–65%`;
-  if (kind === "sharpen" || kind === "race") return `${lift} 2 × 5 @ 60%, fast`;
-  if (kind === "peak") return `${lift} 3 × 5 @ 70–80%, crisp`;
-  return `${lift} ${c.h.strength === "build" ? waves[step] : maint[step]}`;
-}
 
 /* Extra work for a weak station, by training intent. From the coach's formats. */
 function weakBlock(c: Ctx, st: Station): HxBlock | null {
@@ -253,22 +246,38 @@ function weakBlock(c: Ctx, st: Station): HxBlock | null {
 }
 
 /** Gym work for the muscles each weak station leans on. Added to a strength day. */
-export const ACCESSORY: Record<Station, { day: "lower" | "upper"; muscles: string; work: (n: number) => string }> = {
-  ski: { day: "upper", muscles: "Lats, triceps and core", work: (n) => `straight-arm cable pulldown ${n} × 12, close-grip bench or dips ${n} × 8, cable crunch ${n} × 12` },
-  push: { day: "lower", muscles: "Quads, glutes and calves", work: (n) => `leg press or hack squat ${n} × 10, single-leg calf raise ${n} × 15 per leg, wall sit in sled-push position ${n} × 40 s` },
-  pull: { day: "upper", muscles: "Upper back, biceps and grip", work: (n) => `chest-supported row ${n} × 10, hammer curl ${n} × 10, towel or rope hang ${n} × max` },
-  bbj: { day: "lower", muscles: "Hips, chest and power", work: (n) => `box jump ${n} × 5, standing broad jump ${n} × 3, push-up ${n} × 12–15` },
-  row: { day: "upper", muscles: "Posterior chain and upper back", work: (n) => `Romanian deadlift ${n} × 8, seated cable row ${n} × 10, back extension ${n} × 12` },
-  farmers: { day: "upper", muscles: "Grip, traps and trunk", work: (n) => `suitcase carry ${n} × 20 m per side, barbell shrug ${n} × 12, plate pinch hold ${n} × 30 s` },
-  lunges: { day: "lower", muscles: "Quads, glutes and adductors", work: (n) => `deficit reverse lunge ${n} × 8 per leg, step-up ${n} × 10 per leg, Copenhagen plank ${n} × 20 s per side` },
-  wb: { day: "lower", muscles: "Quads, shoulders and core", work: (n) => `front squat ${n} × 6 @ 70%, push press ${n} × 6, thruster ${n} × 10 with the race ball` },
+export const ACCESSORY: Record<Station, { day: "lower" | "upper"; muscles: string; work: [(n: number) => string, (n: number) => string] }> = {
+  ski: { day: "upper", muscles: "Lats, triceps and core", work: [
+    (n) => `straight-arm cable pulldown ${n} × 12, close-grip bench or dips ${n} × 8, cable crunch ${n} × 12`,
+    (n) => `lat pulldown ${n} × 10, rope triceps pushdown ${n} × 15, hanging knee raise ${n} × 12`] },
+  push: { day: "lower", muscles: "Quads, glutes and calves", work: [
+    (n) => `leg press or hack squat ${n} × 10, single-leg calf raise ${n} × 15 per leg, wall sit in sled-push position ${n} × 40 s`,
+    (n) => `heels-elevated goblet squat ${n} × 12, sled-position plank on a wall ${n} × 30 s, seated calf raise ${n} × 20`] },
+  pull: { day: "upper", muscles: "Upper back, biceps and grip", work: [
+    (n) => `chest-supported row ${n} × 10, hammer curl ${n} × 10, towel or rope hang ${n} × max`,
+    (n) => `single-arm DB row ${n} × 10 per side, face pull ${n} × 15, fat-grip or towel row ${n} × 12`] },
+  bbj: { day: "lower", muscles: "Hips, chest and power", work: [
+    (n) => `box jump ${n} × 5, standing broad jump ${n} × 3, push-up ${n} × 12–15`,
+    (n) => `KB swing ${n} × 15, hip-flexor march ${n} × 10 per leg, hand-release push-up ${n} × 10`] },
+  row: { day: "upper", muscles: "Posterior chain and upper back", work: [
+    (n) => `Romanian deadlift ${n} × 8, seated cable row ${n} × 10, back extension ${n} × 12`,
+    (n) => `good morning ${n} × 10, inverted row ${n} × 10, dead bug ${n} × 10 per side`] },
+  farmers: { day: "upper", muscles: "Grip, traps and trunk", work: [
+    (n) => `suitcase carry ${n} × 20 m per side, barbell shrug ${n} × 12, plate pinch hold ${n} × 30 s`,
+    (n) => `trap-bar holds ${n} × 30 s heavy, wrist roller ${n} × 2 trips, Pallof press ${n} × 10 per side`] },
+  lunges: { day: "lower", muscles: "Quads, glutes and adductors", work: [
+    (n) => `deficit reverse lunge ${n} × 8 per leg, step-up ${n} × 10 per leg, Copenhagen plank ${n} × 20 s per side`,
+    (n) => `split squat ${n} × 10 per leg @ lunge weight, single-leg hip thrust ${n} × 10, cossack squat ${n} × 6 per side`] },
+  wb: { day: "lower", muscles: "Quads, shoulders and core", work: [
+    (n) => `front squat ${n} × 6 @ 70%, push press ${n} × 6, thruster ${n} × 10 with the race ball`,
+    (n) => `goblet squat ${n} × 12, DB overhead press ${n} × 10, med-ball sit-up throw ${n} × 15`] },
 };
-
 function accessoryBlock(spec: WeekSpec, st: Station): HxBlock | null {
-  if (spec.kind === "bench" || spec.kind === "test" || spec.kind === "race") return null;
+  const v = spec.w % 2;
+  if (spec.kind === "bench" || spec.kind === "test" || spec.kind === "race" || spec.kind === "absorb") return null;
   const n = spec.kind === "strength" || spec.kind === "build" ? 3 : 2;
   const a = ACCESSORY[st];
-  return { label: `Accessory · ${STATION[st].label}`, acc: st, min: n * 3, text: `${a.muscles}: ${a.work(n)}` };
+  return { label: `Accessory · ${STATION[st].label}`, acc: st, min: n * 3, text: `${a.muscles}: ${a.work[v](n)}` };
 }
 
 /** Where each weak station's extra work goes, in order of preference. */
@@ -283,21 +292,78 @@ const HOST: Record<Station, HxSlot[]> = {
   bbj: ["quality", "upper", "lower", "aerobic"],
 };
 
+/* ---------- Variety ----------
+ * Every session type rotates through the coach's formats from the year review, so no two
+ * weeks in a row repeat. The periodisation (phase, volume, intensity) stays the same. */
+
+const pick = <T,>(a: readonly T[], i: number): T => a[((i % a.length) + a.length) % a.length];
+/** 0 = weeks 1–4, 1 = weeks 5–8, 2 = weeks 9–12: the main lift changes each block. */
+const blockOf = (c: Ctx) => (c.spec.w < 4 ? 0 : c.spec.w < 8 ? 1 : 2);
+/** Which of a phase's formats this week uses. */
+const turn = (c: Ctx) => (c.spec.kind === "absorb" ? (c.spec.w < 6 ? 0 : 1) : c.spec.step);
+
+const LIFTS = {
+  squat: { maintain: ["Back squat", "Front squat", "Box squat"], build: ["Box squat", "Back squat", "Front squat"] },
+  bench: { maintain: ["Bench press", "DB bench press", "Push press"], build: ["Bench press", "Close-grip bench", "Push press"] },
+  deadlift: { maintain: ["Deadlift", "Trap-bar deadlift", "Romanian deadlift"], build: ["Deadlift", "Trap-bar deadlift", "Deficit deadlift"] },
+} as const;
+const liftName = (c: Ctx, l: keyof typeof LIFTS) => pick(LIFTS[l][c.h.strength], blockOf(c));
+
+/** Main lifts: the in-season maintenance cycle (3×15 → 4×10 → 5×5) or the off-season waves, on a variation that changes each block. */
+function lift(c: Ctx, l: keyof typeof LIFTS): string {
+  const { kind, step } = c.spec;
+  const name = liftName(c, l);
+  const waves = ["65/75/85% × 5, 5, 5+", "70/80/90% × 3, 3, 3+", "75/85/95% × 5, 3, 1+"];
+  const maint = ["3 × 15 @ 45–65%", "4 × 10 @ 50–70%", "5 × 5 @ 60–80%"];
+  if (kind === "absorb") return c.h.strength === "build" ? `${name} 40/50/60% × 5` : `${name} 3 × 8 @ 45–65%`;
+  if (kind === "sharpen" || kind === "race") return `${name} 2 × 5 @ 60%, fast`;
+  if (kind === "peak") return `${name} ${pick(["3 × 5 @ 70–80%, crisp", "4 × 4 @ 75%, fast up"], step)}`;
+  return `${name} ${c.h.strength === "build" ? waves[step] : maint[step]}`;
+}
+
 function aerobic(c: Ctx): HxBlock[] {
   const d = c.div;
-  const n = c.spec.kind === "absorb" ? 3 : c.spec.kind === "strength" ? 4 : 5;
-  c.add("farmers", 100 * n);
-  return [{ label: "Main", min: n * 6.5, text: `${n} × (5 min bike @ 60% FTP + 100 m farmers carry @ ${c.w(d.farmers)} per hand)` }];
+  const k = c.spec.kind;
+  if (k === "absorb") {
+    c.add("ski", 1000); c.add("row", 1000);
+    return [{ label: "Main", min: 30, text: "Hybrid z2: 3 × (5 min bike + 5 min ski or row), easy" }];
+  }
+  const n = k === "strength" ? 4 : 5;
+  switch (c.spec.w % 4) {
+    case 0:
+      c.add("farmers", 100 * n);
+      return [{ label: "Main", min: n * 6.5, text: `${n} × (5 min bike @ 60% FTP + 100 m farmers carry @ ${c.w(d.farmers)} per hand)` }];
+    case 1:
+      c.add("row", 3 * 1100); c.add("ski", 3 * 1000);
+      return [{ label: "Main", min: 48, text: `Recovery machines 3 × (5 min bike, 5 min row, 5 min ski) relaxed, with 5 weighted pull-ups after each round, not heavy` }];
+    case 2:
+      c.add("farmers", 400); c.add("wb", 40); c.add("lunges", 50);
+      return [
+        { label: "A", min: 26, text: `4 × (5 min bike @ 60% FTP + 100 m farmers carry @ ${c.w(d.farmers)})` },
+        { label: "B", min: 10, text: `EMOM 10, alternating 8 heavy WB (${c.w(d.wb + (d.wb >= 9 ? 3 : 2))}) and 10 walking lunges @ ${c.w(d.lunges)}` },
+      ];
+    default:
+      c.add("ski", 2 * 1000); c.add("row", 2 * 1100);
+      return [{ label: "Main", min: 40, text: `Bike fartlek 20 min (4 × 4 min easy @ 50% FTP + 1 min hard), then 2 × (5 min ski + 5 min row) easy` }];
+  }
 }
 
 function lower(c: Ctx): HxBlock[] {
   const d = c.div;
   const k = c.spec.kind;
+  const t = turn(c);
   if (k === "absorb") {
-    c.add("push", 20); c.add("lunges", 30); c.add("wb", 30); c.add("pull", 25);
+    if (t === 0) {
+      c.add("push", 20); c.add("lunges", 30); c.add("wb", 30); c.add("pull", 25);
+      return [
+        { label: "A", min: 15, text: lift(c, "squat") },
+        { label: "B", min: 28, text: `Aerobic sandwich, 4 rounds: 4 min easy bike + one station @ race weight, rotating 20 m push / 30 m lunges / 30 WB / 25 m pull. Controlled.` },
+      ];
+    }
+    c.add("lunges", 30); c.add("wb", 30); c.add("push", 36);
     return [
-      { label: "A", min: 15, text: lift(c, "Squat") },
-      { label: "B", min: 28, text: `4 rounds: 4 min easy bike + one station @ race weight, rotating 20 m push / 30 m lunges / 30 WB / 25 m pull. Controlled.` },
+      { label: "A", min: 15, text: lift(c, "squat") },
+      { label: "B", min: 20, text: `Station touch, 3 rounds: 10 walking lunges + 10 WB + 12 m sled push @ race weight, full recovery. Just feel the weight.` },
     ];
   }
   if (k === "sharpen") {
@@ -308,15 +374,41 @@ function lower(c: Ctx): HxBlock[] {
     ];
   }
   const lunge = c.n(3, "lunges"), wbSets = c.n(k === "strength" ? 3 : 4, "wb");
-  const wbReps = k === "strength" ? 20 : k === "build" ? 20 : 30;
-  c.add("lunges", 20 * lunge); c.add("wb", wbSets * wbReps);
-  return [
-    { label: "A", min: 18, text: lift(c, k === "peak" ? "Squat" : c.h.strength === "build" ? "Box squat" : "Squat") },
-    k === "strength"
-      ? { label: "B", min: 12, text: `Bulgarian split squats 3 × 8 per leg, then walking lunges ${lunge} × 20 m @ ${c.w(d.lunges)}` }
-      : { label: "B", min: 12, text: `Walking lunges ${lunge} × 20 m @ ${c.w(d.lunges)}, rest 1:1. Stay tall, quick turnover.` },
-    { label: "C", min: wbSets * 1.5, text: `Wall balls ${wbSets} × ${wbReps} unbroken @ ${c.w(d.wb)}, 45 s rest` },
-  ];
+  const A: HxBlock = { label: "A", min: 18, text: lift(c, "squat") };
+  let B: HxBlock, C: HxBlock;
+  if (k === "peak") {
+    if (t === 0) { c.add("lunges", 25 * lunge); B = { label: "B", min: 12, text: `Walking lunges ${lunge} × 25 m @ ${c.w(d.lunges)}, rest 1:1. Prioritise speed: quick turnover, stay tall, keep driving forward.` }; }
+    else { const s = Math.min(4, lunge); c.add("lunges", 50 * s); B = { label: "B", min: 14, text: `Lunges for speed: ${s} × 50 m @ ${c.w(d.lunges - 10)} (race weight minus 10 kg), 2 min rest` }; }
+    if (t === 0) { c.add("wb", wbSets * 30); C = { label: "C", min: wbSets * 2, text: `Wall balls ${wbSets} × 30 unbroken @ ${c.w(d.wb)}, 60 s rest. Find a machine pace that lets you avoid breaks.` }; }
+    else { const r = Math.max(3, wbSets - 1); c.add("wb", 35 * r); c.add("ski", 400 * r); C = { label: "C", min: r * 4, text: `${r} × (400 m ski @ 2k pace + 35 unbroken WB @ ${c.w(d.wb)}), 90 s rest` }; }
+    return [A, B, C];
+  }
+  switch (c.spec.w % 3) {
+    case 0: c.add("lunges", 20 * lunge); B = { label: "B", min: 12, text: `Bulgarian split squats 3 × 8 per leg @ lunge weight or heavier, then walking lunges ${lunge} × 20 m @ ${c.w(d.lunges)}` }; break;
+    case 1: c.add("lunges", 20 * lunge); B = { label: "B", min: 12, text: `Reverse lunges 3 × 10 per leg, then DB goblet walking lunges ${lunge} × 20 m @ ${c.w(d.lunges)}, rest 1:1` }; break;
+    default: c.add("lunges", 25 * lunge); B = { label: "B", min: 14, text: `Step-ups 3 × 8 per leg, then walking lunges ${lunge} × 25 m @ ${c.w(d.lunges + 5)}. Expect the legs to burn.` };
+  }
+  switch ((c.spec.w + 1) % 3) {
+    case 0: c.add("wb", wbSets * 20); C = { label: "C", min: wbSets * 1.5, text: `Wall balls ${wbSets} × 20 unbroken @ ${c.w(d.wb)}, 45 s rest` }; break;
+    case 1: { const top = 10 * Math.min(3, wbSets); const ladder = [] as number[]; for (let r = 10; r <= top; r += 10) ladder.push(r); for (let r = top - 10; r >= 10; r -= 10) ladder.push(r);
+      const total = ladder.reduce((a, b) => a + b, 0); c.add("wb", total); c.add("row", 250 * (ladder.length - 1));
+      C = { label: "C", min: Math.round(total / 12 + ladder.length * 1.5), text: `WB ladder ${ladder.join("-")} @ ${c.w(d.wb)}, 250 m row between sets` }; break; }
+    default: { const r = Math.max(2, wbSets - 1); c.add("wb", 30 * r); c.add("row", 500 * r);
+      C = { label: "C", min: r * 4, text: `${r} × (500 m row @ 2k pace + 30 unbroken WB @ ${c.w(d.wb)}), 2 min rest` }; }
+  }
+  return [A, B, C];
+}
+
+/** Upper/posterior E4MOM supersets at 65–80%, with the rep range and pairing changing each week. */
+function upperA(c: Ctx): string {
+  const bench = liftName(c, "bench"), dl = liftName(c, "deadlift");
+  if (c.h.strength === "build" && c.spec.kind !== "peak") return `${lift(c, "bench")}; ${lift(c, "deadlift")}`;
+  const u = pick([
+    { b: "8 @ 65%", p: "pull-ups 8", d: "4 @ 75–80%", h: "DB RDL 10" },
+    { b: "6 @ 70%", p: "bent-over row 8", d: "5 @ 70–75%", h: "KB swing 15" },
+    { b: "5 @ 75–80%", p: "weighted chin-ups 5", d: "3 @ 80%", h: "hip thrust 10" },
+  ], c.spec.kind === "peak" ? c.spec.step + 1 : c.spec.step);
+  return `E4MOM × 3: ${bench} ${u.b} + ${u.p}; ${dl} ${u.d} + ${u.h}`;
 }
 
 function upper(c: Ctx): HxBlock[] {
@@ -324,54 +416,119 @@ function upper(c: Ctx): HxBlock[] {
   const k = c.spec.kind;
   if (k === "absorb") {
     c.add("pull", 100);
-    return [
+    if (turn(c) === 0) return [
       { label: "A", min: 12, text: `E4MOM × 3: bench 8 @ 65% + pull-ups 8` },
       { label: "B", min: 30, text: `Sled pull 5 × (4 min easy bike + 2 min pulls @ ${c.w(d.pull)})` },
+    ];
+    c.add("wb", 64);
+    return [
+      { label: "A", min: 12, text: `E4MOM × 3: bench 8 @ 65% + pull-ups 8` },
+      { label: "B", min: 8, text: `Heavy ball EMOM 8 × 8 with ${c.w(d.wb + (d.wb >= 9 ? 3 : 2))}, best possible form` },
+      { label: "C", min: 30, text: `Sled pull 5 × (4 min easy bike + 2 min pulls @ ${c.w(d.pull)})` },
     ];
   }
   if (k === "sharpen") {
     c.add("ski", 750); c.add("push", 45); c.add("bbj", 30); c.add("row", 750); c.add("farmers", 150); c.add("lunges", 45);
     return [{ label: "Main", min: 40, text: `E2MOM 1:20 on / 0:40 off × 3: ski, sled push, BBJ, row, farmers carry, lunges, then 5 min easy bike between rounds` }];
   }
-  const push = c.n(6, "push"), pull = c.n(4, "pull"), carry = c.n(3, "farmers");
-  c.add("push", 12 * push); c.add("pull", 12.5 * pull); c.add("farmers", 50 * carry);
-  const pushText = k === "peak"
-    ? `Sled push ${push} × 12 m @ ${c.w(d.push)}, break only at 5–6 m`
-    : `Sled push E2MOM ${push} × 12 m from ${c.w(d.push)}, adding ${c.inc(5)} a round`;
-  return [
-    { label: "A", min: 14, text: c.h.strength === "build" && k !== "peak" ? `${lift(c, "Bench")}; ${lift(c, "Deadlift")}` : `E4MOM × 3: bench 8 @ 65–70% + pull-ups 8; deadlift 4 @ 75–80% + DB RDL 10` },
-    { label: "B", min: push * 2, text: pushText },
-    { label: "C", min: pull * 2 + carry * 1.5, text: `Sled pull ${pull} × 12.5 m @ ${c.w(d.pull + 10)}; farmers carry ${carry} × 50 m @ ${c.w(d.farmers)}` },
-  ];
+  const A: HxBlock = { label: "A", min: 14, text: upperA(c) };
+  let B: HxBlock, C: HxBlock;
+  if (k === "peak") {
+    const n = c.n(6, "push");
+    if (c.spec.step === 0) { c.add("push", 12 * n); B = { label: "B", min: n * 2, text: `Sled push ${n} × 12 m @ ${c.w(d.push)}. Break every 5–6 m, don't push until you're ready.` }; }
+    else { c.add("push", 12.5 * n); B = { label: "B", min: n * 2, text: `Sled push ramp ${n} × 12.5 m: start @ ${c.w(d.push - 20)}, race weight by set 4, ${c.w(d.push + 20)} by the finish` }; }
+  } else {
+    switch (c.spec.w % 3) {
+      case 0: { const n = c.n(6, "push"); c.add("push", 12 * n); B = { label: "B", min: n * 2, text: `Sled push E2MOM ${n} × 12 m from ${c.w(d.push)}, adding ${c.inc(5)} a round` }; break; }
+      case 1: { const n = c.n(4, "push"); c.add("push", 25 * n); B = { label: "B", min: n * 4, text: `Sled push E4MOM ${n} × 25 m from ${c.w(d.push)}, adding ${c.inc(10)} a round. Increase the weight from last time.` }; break; }
+      default: { const n = c.n(5, "push"); c.add("push", 20 * n); c.add("ski", 200 * n); B = { label: "B", min: n * 3, text: `${n} × (200 m ski + 20 m sled push @ ${c.w(d.push + 20)}), rest 1:1` }; }
+    }
+  }
+  const pull = c.n(4, "pull"), carry = c.n(3, "farmers");
+  switch ((c.spec.w + 2) % 3) {
+    case 0: c.add("pull", 12.5 * pull); c.add("farmers", 50 * carry);
+      C = { label: "C", min: pull * 2 + carry * 1.5, text: `Sled pull ${pull} × 12.5 m @ ${c.w(d.pull + 10)}; farmers carry ${carry} × 50 m @ ${c.w(d.farmers)}` }; break;
+    case 1: c.add("pull", 12.5 * pull); c.add("farmers", 30 * carry);
+      C = { label: "C", min: pull * 2 + carry * 1.5, text: `Sled pull E2MOM ${pull} × 12.5 m from ${c.w(d.pull)}, adding ${c.inc(5)} a round; heavy farmers ${carry} × 30 m @ ${c.w(d.farmers + 8)}` }; break;
+    default: { const lp = Math.max(2, pull - 1); c.add("pull", 25 * lp); c.add("farmers", 100 * Math.max(2, carry - 1));
+      C = { label: "C", min: lp * 3 + 4, text: `Sled pull ${lp} × 25 m @ ${c.w(d.pull)}: big strong pulls, arms and hip drive only; farmers ${Math.max(2, carry - 1)} × 100 m unbroken @ ${c.w(d.farmers)}` }; }
+  }
+  return [A, B, C];
 }
 
 function quality(c: Ctx): HxBlock[] {
   const d = c.div;
   const k = c.spec.kind;
   if (k === "absorb") {
-    c.add("ski", 1000); c.add("row", 1000); c.add("bbj", 25); c.add("farmers", 50);
-    return [{ label: "Main", min: 45, text: `Easy AMRAP 45 min: 1 km ski, 1 km row, 25 burpees, 50 m farmers carry. RPE 4 out of 10.` }];
+    if (turn(c) === 0) {
+      c.add("ski", 1000); c.add("row", 1000); c.add("bbj", 25); c.add("farmers", 50);
+      return [{ label: "Main", min: 45, text: `Easy AMRAP 45 min: 1 km ski, 1 km row, 25 burpees, 50 m farmers carry. RPE 4 out of 10.` }];
+    }
+    c.add("bbj", 40); c.add("lunges", 40); c.add("wb", 20); c.add("push", 48); c.add("pull", 48); c.add("farmers", 200);
+    return [{ label: "Main", min: 45, text: `Station touch, easy: 2 rounds (5 BBJ + 10 walking lunges, 5 BBJ + 10 WB), 4 × 12 m push, 4 × 12 m pull, 2 × 100 m farmers. Not a suffer fest.` }];
   }
   if (k === "strength") {
-    const r = c.n(3);
-    c.add("ski", 250 * 5); c.add("push", 12.5 * 5);
-    if (r >= 2) { c.add("bbj", 16 * 5); c.add("row", 250 * 5); }
-    if (r >= 3) { c.add("farmers", 50 * 5); c.add("wb", 15 * 5); }
-    return [{ label: "Main", min: r * 20, text: `${r} × (${c.leg(2000, "threshold")} + 10 min EMOM alternating). Round 1: 15 cal ski / 12.5 m sled push. Round 2: 8 BBJ / 15 cal row. Round 3: 50 m farmers / 15 WB. Transitions under 30 s.` }];
+    switch (c.spec.step) {
+      case 0: {
+        const r = c.n(3);
+        c.add("ski", 250 * 5); c.add("push", 12.5 * 5);
+        if (r >= 2) { c.add("bbj", 16 * 5); c.add("row", 250 * 5); }
+        if (r >= 3) { c.add("farmers", 50 * 5); c.add("wb", 15 * 5); }
+        return [{ label: "Main", min: r * 20, text: `${r} × (${c.leg(2000, "threshold")} + 10 min EMOM alternating). Round 1: 15 cal ski / 12.5 m sled push. Round 2: 8 BBJ / 15 cal row. Round 3: 50 m farmers / 15 WB. Transitions under 30 s.` }];
+      }
+      case 1: {
+        const r = c.n(3); // ~3 rounds of each AMRAP
+        c.add("row", 500 * r * 2); c.add("bbj", 20 * r * 2); c.add("push", 25 * r * 2); c.add("lunges", 20 * r * 2);
+        return [{ label: "Main", min: r * 11, text: `Station AMRAPs: ${r} × AMRAP 8 min (500 m row, 20 m BBJ, 25 m sled push @ ${c.w(d.push)}, 20 walking lunges @ ${c.w(d.lunges)}), 3 min easy bike between. Push hard on the stations, use the bike to reset.` }];
+      }
+      default: {
+        const r = c.n(4);
+        c.add("wb", 25 * r);
+        return [{ label: "Main", min: r * 11, text: `Threshold endurance: ${r} × (${c.leg(1000, "threshold")} + 25 WB @ ${c.w(d.wb)} + 5 min easy bike)` }];
+      }
+    }
   }
   if (k === "build") {
-    const r = c.n(4);
-    c.add("row", 400 * r); c.add("farmers", 100 * r); c.add("lunges", 20 * r); c.add("pull", 12 * r); c.add("ski", 400 * r); c.add("wb", 20 * r);
-    return [
-      { label: "A", min: r * 5, text: `${r} × (400 m row, 100 m farmers @ ${c.w(d.farmers)}, 20 m lunges @ ${c.w(d.lunges + 5)}, 12 m sled pull from ${c.w(d.pull)} adding ${c.inc(5)} a round)` },
-      { label: "B", min: r * 4, text: `${r} × (20 cal bike, 400 m ski, 20 WB)` },
-    ];
+    switch (c.spec.step) {
+      case 0: {
+        const r = c.n(4);
+        c.add("row", 400 * r); c.add("farmers", 100 * r); c.add("lunges", 20 * r); c.add("pull", 12 * r); c.add("ski", 400 * r); c.add("wb", 20 * r);
+        return [
+          { label: "A", min: r * 5, text: `${r} × (400 m row, 100 m farmers @ ${c.w(d.farmers)}, 20 m lunges @ ${c.w(d.lunges + 5)}, 12 m sled pull from ${c.w(d.pull)} adding ${c.inc(5)} a round)` },
+          { label: "B", min: r * 4, text: `${r} × (20 cal bike, 400 m ski, 20 WB)` },
+        ];
+      }
+      case 1: {
+        c.add("row", 1500); c.add("lunges", 75); c.add("wb", 75);
+        return [{ label: "Main", min: 45, text: `Descending ladder: ${c.leg(2000, "threshold")}, 1 km row, 50 m lunges @ ${c.w(d.lunges)}, 50 WB; rest 3 min; then ${c.leg(1000, "threshold")}, 500 m row, 25 m lunges, 25 WB. Transition immediately.` }];
+      }
+      default: {
+        const r = c.n(5);
+        const st = ["400 m ski", "40 m BBJ", "25 WB", "25 m sled push", "50 m farmers"];
+        for (let i = 0; i < r; i++) {
+          const s = st[i % 5];
+          if (s.includes("ski")) c.add("ski", 400); else if (s.includes("BBJ")) c.add("bbj", 40); else if (s.includes("WB")) c.add("wb", 25); else if (s.includes("push")) c.add("push", 25); else c.add("farmers", 50);
+        }
+        c.add("wb", 60);
+        return [
+          { label: "A", min: r * 5, text: `${r} × (${c.leg(600, "threshold")} + one station @ race weight: ${st.slice(0, Math.min(r, 5)).join(" / ")}), 75 s rest` },
+          { label: "B", min: 10, text: `EMOM 10: odd 30 s bike @ RPE 8, even 12 WB, best form` },
+        ];
+      }
+    }
   }
   if (k === "sharpen" && c.h.benchmarks) {
     c.add("ski", 2000); c.add("push", 100); c.add("pull", 100); c.add("lunges", 100); c.add("wb", 100);
     return [
       { label: "A", min: 25, text: `2 × (${c.leg(1000, "race pace")} + 1 km ski + 50 m sled push + 50 m sled pull)` },
       { label: "Benchmark", min: 15, text: `Repeat week 1: ${c.leg(1000, "race effort")}, then 100 m lunges @ ${c.w(d.lunges)} for time, then 100 WB for time. Compare times and breaks.` },
+    ];
+  }
+  if (k === "peak" && c.spec.step === 1) {
+    c.add("ski", 1000); c.add("push", 50); c.add("pull", 50); c.add("bbj", 80); c.add("wb", 100);
+    return [
+      { label: "A", min: 30, text: `First half race simulation: ${c.leg(1000, "race pace")} + 1 km ski, ${c.leg(1000, "race pace")} + 50 m push, ${c.leg(1000, "race pace")} + 50 m pull, ${c.leg(1000, "race pace")} + 80 m BBJ` },
+      { label: "B", min: 16, text: `Then 4 × (${c.leg(400, "threshold")} + 25 WB @ ${c.w(d.wb)}): 100 WB for time after 400s` },
     ];
   }
   const r = c.n(3);
