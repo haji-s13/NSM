@@ -297,19 +297,16 @@ const HOST: Record<Station, HxSlot[]> = {
  * weeks in a row repeat. The periodisation (phase, volume, intensity) stays the same. */
 
 const pick = <T,>(a: readonly T[], i: number): T => a[((i % a.length) + a.length) % a.length];
-/** 0 = weeks 1–4, 1 = weeks 5–8, 2 = weeks 9–12: the main lift changes each block. */
+/** 0 = weeks 1–4, 1 = weeks 5–8, 2 = weeks 9–12. */
 const blockOf = (c: Ctx) => (c.spec.w < 4 ? 0 : c.spec.w < 8 ? 1 : 2);
 /** Which of a phase's formats this week uses. */
 const turn = (c: Ctx) => (c.spec.kind === "absorb" ? (c.spec.w < 6 ? 0 : 1) : c.spec.step);
 
-const LIFTS = {
-  squat: { maintain: ["Back squat", "Front squat", "Box squat"], build: ["Box squat", "Back squat", "Front squat"] },
-  bench: { maintain: ["Bench press", "DB bench press", "Push press"], build: ["Bench press", "Close-grip bench", "Push press"] },
-  deadlift: { maintain: ["Deadlift", "Trap-bar deadlift", "Romanian deadlift"], build: ["Deadlift", "Trap-bar deadlift", "Deficit deadlift"] },
-} as const;
-const liftName = (c: Ctx, l: keyof typeof LIFTS) => pick(LIFTS[l][c.h.strength], blockOf(c));
+/** The main lifts stay the same all 12 weeks, as in the coach's cycles; only sets, reps and load change. */
+const LIFTS = { squat: "Box squat", bench: "Bench press", deadlift: "Deadlift" } as const;
+const liftName = (_c: Ctx, l: keyof typeof LIFTS) => LIFTS[l];
 
-/** Main lifts: the in-season maintenance cycle (3×15 → 4×10 → 5×5) or the off-season waves, on a variation that changes each block. */
+/** Main lifts: the in-season maintenance cycle (3×15 → 4×10 → 5×5) or the off-season waves, adding load each time through. */
 function lift(c: Ctx, l: keyof typeof LIFTS): string {
   const { kind, step } = c.spec;
   const name = liftName(c, l);
@@ -318,7 +315,8 @@ function lift(c: Ctx, l: keyof typeof LIFTS): string {
   if (kind === "absorb") return c.h.strength === "build" ? `${name} 40/50/60% × 5` : `${name} 3 × 8 @ 45–65%`;
   if (kind === "sharpen" || kind === "race") return `${name} 2 × 5 @ 60%, fast`;
   if (kind === "peak") return `${name} ${pick(["3 × 5 @ 70–80%, crisp", "4 × 4 @ 75%, fast up"], step)}`;
-  return `${name} ${c.h.strength === "build" ? waves[step] : maint[step]}`;
+  const more = blockOf(c) > 0 ? `, ${c.h.weightUnit === "lb" ? "5–10 lb" : "2.5–5 kg"} more than last cycle` : "";
+  return `${name} ${c.h.strength === "build" ? waves[step] : maint[step]}${more}`;
 }
 
 function aerobic(c: Ctx): HxBlock[] {
@@ -417,12 +415,12 @@ function upper(c: Ctx): HxBlock[] {
   if (k === "absorb") {
     c.add("pull", 100);
     if (turn(c) === 0) return [
-      { label: "A", min: 12, text: `E4MOM × 3: bench 8 @ 65% + pull-ups 8` },
+      { label: "A", min: 12, text: `E4MOM × 3: Bench press 8 @ 65% + pull-ups 8` },
       { label: "B", min: 30, text: `Sled pull 5 × (4 min easy bike + 2 min pulls @ ${c.w(d.pull)})` },
     ];
     c.add("wb", 64);
     return [
-      { label: "A", min: 12, text: `E4MOM × 3: bench 8 @ 65% + pull-ups 8` },
+      { label: "A", min: 12, text: `E4MOM × 3: Bench press 8 @ 65% + pull-ups 8` },
       { label: "B", min: 8, text: `Heavy ball EMOM 8 × 8 with ${c.w(d.wb + (d.wb >= 9 ? 3 : 2))}, best possible form` },
       { label: "C", min: 30, text: `Sled pull 5 × (4 min easy bike + 2 min pulls @ ${c.w(d.pull)})` },
     ];
