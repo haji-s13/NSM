@@ -28,7 +28,7 @@ export function PbForm() {
       </div>
       <div className="flex flex-col gap-2">
         <Label htmlFor="pb-time">PB time</Label>
-        <Input id="pb-time" className="num" inputMode="numeric" autoComplete="off" value={s.pbTime}
+        <Input id="pb-time" className="num" type="text" inputMode="text" autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} enterKeyHint="done" value={s.pbTime}
           onChange={(e) => update({ pbTime: e.target.value })} placeholder="19:45" aria-invalid={!model} />
       </div>
       <div className="flex flex-col gap-2">
@@ -48,7 +48,7 @@ export function PbForm() {
       </div>
       {!model && (
         <p role="alert" className="col-span-full font-black text-status-error">
-          Enter a valid time, for example 19:45 for a 5k or 41:30 for a 10k.
+          Enter a valid time, for example 19:45 for a 5k or 41:30 for a 10k. A dot works too: 19.45.
         </p>
       )}
     </div>

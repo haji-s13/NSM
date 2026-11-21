@@ -1,9 +1,12 @@
 export const KM_PER_MI = 1.609344;
 export type Units = "km" | "mi";
 
-/** "19:45" → 1185, "1:05:30" → 3930. NaN when invalid. */
+/** "19:45" → 1185, "1:05:30" → 3930 ("19.45" and "19,45" also work). NaN when invalid. */
 export function parseTime(str: string): number {
-  const parts = String(str).trim().split(":");
+  let t = String(str).trim();
+  // Phones: allow "19.45", "19,45" or "1.30.15" when a colon is awkward to type.
+  if (!t.includes(":")) t = t.replace(/[.,;\s]+/g, ":");
+  const parts = t.split(":");
   if (parts.length < 2 || parts.length > 3) return NaN;
   if (!parts.every((p) => /^\d+(\.\d+)?$/.test(p))) return NaN;
   const nums = parts.map(Number);
