@@ -59,7 +59,7 @@ export function icuEvent(wk: Week, i: number, u: Units, p: Paces): IcuEvent {
 
 async function icuCall(athleteId: string | undefined, path: string, method: string, body?: unknown) {
   const key = icuKey();
-  if (!key) throw new Error("Add your intervals.icu API key on the Connections tab first.");
+  if (!key) throw new Error("Add your intervals.icu API key under Connections on Profile first.");
   const athlete = encodeURIComponent((athleteId || "").trim() || "0");
   const headers: Record<string, string> = { Authorization: "Basic " + btoa("API_KEY:" + key) };
   if (body !== undefined) headers["Content-Type"] = "application/json";
@@ -69,7 +69,7 @@ async function icuCall(athleteId: string | undefined, path: string, method: stri
   } catch {
     throw new Error("Couldn't reach intervals.icu. Check your connection and try again.");
   }
-  if (res.status === 401 || res.status === 403) throw new Error("intervals.icu rejected the API key or athlete ID. Check them on the Connections tab.");
+  if (res.status === 401 || res.status === 403) throw new Error("intervals.icu rejected the API key or athlete ID. Check them under Connections on Profile.");
   if (res.status === 404) throw new Error("intervals.icu couldn't find that athlete ID. Leave it blank to use your own account.");
   if (!res.ok) throw new Error(`intervals.icu returned an error (${res.status}).`);
   return res;

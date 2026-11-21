@@ -6,6 +6,8 @@ import { PbForm } from "./pb-form";
 import { RaceTable } from "./race-table";
 import { PaceTable } from "./pace-table";
 import { SeasonCard } from "@/components/plans/season-card";
+import { CorosCard } from "@/components/connections/coros-card";
+import { IntervalsCard } from "@/components/connections/intervals-card";
 
 /** Profile: your PB, your season (shared by both plans), and the paces they're built from. */
 export function PacesScreen() {
@@ -16,7 +18,7 @@ export function PacesScreen() {
       <section className="flex flex-col gap-2">
         <h1 className="font-display text-[2rem] leading-10 font-black md:text-display">Profile</h1>
         <p className="max-w-[65ch] text-muted-foreground">
-          {name ? `${name}: your` : "Your"} PB and your season. The run plan and the HYROX plan are both built from what you set here.
+          {name ? `${name}: your` : "Your"} PB, your season and your connections. The run plan and the HYROX plan are both built from what you set here.
         </p>
       </section>
 
@@ -56,6 +58,17 @@ export function PacesScreen() {
           </CardContent>
         </Card>
       </div>
+
+      <section id="connections" className="flex scroll-mt-8 flex-col gap-4">
+        <div className="flex flex-col gap-1">
+          <h2 className="font-display text-[2rem] leading-10 font-black">Connections</h2>
+          <p className="max-w-[65ch] text-muted-foreground">Send workouts to your watch. Connect COROS directly, or use intervals.icu for COROS, Garmin and others.</p>
+        </div>
+        <div className="grid gap-8 lg:grid-cols-2">
+          <CorosCard />
+          <IntervalsCard />
+        </div>
+      </section>
     </div>
   );
 }

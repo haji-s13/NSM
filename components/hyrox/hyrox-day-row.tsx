@@ -27,11 +27,11 @@ const HX_INK: Record<HxDayType, string> = {
 };
 
 /** One day: when, what (block by block), how long, the linked run, and actions. */
-export function HyroxDayRow({ wk, i, onIcu, busy }: { wk: HxWeek; i: number; onIcu: () => void; busy: boolean }) {
+export function HyroxDayRow({ wk, i, onIcu, busy, hideRun = false }: { wk: HxWeek; i: number; onIcu: () => void; busy: boolean; hideRun?: boolean }) {
   const { plan, settings } = useApp();
   const d = wk.days[i];
   const run = plan?.weeks[wk.n - 1]?.days[i];
-  const runLine = run && run.type !== "rest" && run.km > 0 ? `${run.type === "easy" ? (run.strides ? "Easy + strides" : "Easy") : run.title} ${dist(run.km, settings.units)}` : null;
+  const runLine = !hideRun && run && run.type !== "rest" && run.km > 0 ? `${run.type === "easy" ? (run.strides ? "Easy + strides" : "Easy") : run.title} ${dist(run.km, settings.units)}` : null;
   const empty = d.type === "off" || !d.blocks.length;
 
   async function copy() {

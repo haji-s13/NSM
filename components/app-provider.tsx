@@ -11,7 +11,7 @@ import { loadLocal, normalizeSettings, saveLocal, type Settings } from "@/lib/se
 import { supabase } from "@/lib/supabase";
 import { COROS_SERVER, corosConnected, corosHandleRedirect, directCoros, type CorosClient } from "@/lib/coros";
 
-export type Screen = "paces" | "builder" | "hyrox" | "connections";
+export type Screen = "dashboard" | "builder" | "hyrox" | "paces";
 type Entry = "guest" | "account" | null;
 
 interface AppState {
@@ -56,14 +56,14 @@ function screenFromHash(): Screen {
   const h = typeof location === "undefined" ? "" : location.hash.slice(1);
   if (h === "builder") return "builder";
   if (h === "hyrox") return "hyrox";
-  if (h === "connections" || h === "intervals") return "connections";
-  return "paces";
+  if (h === "paces" || h === "profile" || h === "connections" || h === "intervals") return "paces";
+  return "dashboard";
 }
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [settings, setSettings] = useState<Settings>(() => normalizeSettings({}));
-  const [screen, setScreenState] = useState<Screen>("paces");
+  const [screen, setScreenState] = useState<Screen>("dashboard");
   const [entry, setEntryState] = useState<Entry>(null);
   const [user, setUser] = useState<User | null>(null);
   const [recovering, setRecovering] = useState(false);
@@ -83,6 +83,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (new URLSearchParams(location.search).get("reset") === "1" || /type=recovery/.test(location.hash)) setRecovering(true);
     setSettings(loadLocal());
     setScreenState(screenFromHash());
+    if (/^#(connections|intervals)$/.test(location.hash)) setTimeout(() => document.getElementById("connections")?.scrollIntoView(), 300);
     setEntryState(readEntry());
     refreshCoros();
     setReady(true);
@@ -91,7 +92,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     corosHandleRedirect().then((r) => {
       if (!r) return;
-      setScreenState("connections");
+      setScreenState("paces");
+      setTimeout(() => document.getElementById("connections")?.scrollIntoView(), 300);
       if (r.ok) toast.success(r.message); else toast.error(r.message);
       refreshCoros();
     });

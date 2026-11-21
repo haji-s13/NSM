@@ -27,7 +27,7 @@ export function BuilderScreen() {
   const { sendIcu, sendCoros, busy, corosReady } = useSend();
   const [confirmAll, setConfirmAll] = useState(false);
   if (!plan || !model) {
-    return <Alert><AlertDescription>Enter a valid PB on Predicted Paces to build a plan.</AlertDescription></Alert>;
+    return <Alert><AlertDescription>Enter a valid PB on Profile to build a plan.</AlertDescription></Alert>;
   }
   const warns = templateWarnings(settings.template);
   if (plan.weeks.some((w) => w.tooLow)) warns.push(`Your volume is too low for this template, so some easy runs were raised to the ${dist(MIN_EASY_KM, settings.units)} minimum. Raise the volume or swap an easy day for rest.`);
