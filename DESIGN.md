@@ -21,9 +21,12 @@ What I looked for and what's actually in the repo:
 | `components.json` (shadcn) | **Not present.** No shadcn/ui installed. |
 | `*.tsx` / `*.jsx` components | **None.** UI is rendered from template strings in `app.js`. |
 
-The repo is a static site: `index.html`, `styles.css`, `app.js`, `config.js`,
-`vendor/supabase-2.118.0.js`. So there's no Next.js app to follow yet. These rules
-govern the Next.js app when it's created, and every new screen from then on.
+At the time of the audit the repo was a static site: `index.html`, `styles.css`, `app.js`, `config.js`,
+`vendor/supabase-2.118.0.js`.
+
+**Migration status (21 Nov 2026):** the Next.js app now exists alongside those files
+(`app/`, `components/`, `lib/`, `package.json`). The old static files stay at the repo root
+only until GitHub Pages is switched to the Actions deploy, then they get removed.
 
 Where today's `styles.css` / `app.js` break the rules below:
 
@@ -47,8 +50,8 @@ Things to keep, because they work:
 
 ## 1. Fonts
 
-Loaded with `next/font/google` in `app/layout.tsx` and exposed as CSS variables.
-Never from a `<link>` tag.
+Self-hosted variable fonts from `@fontsource-variable/*`, loaded with `next/font/local` in
+`app/fonts.ts` and exposed as CSS variables, so builds need no network. Never from a `<link>` tag.
 
 | Role | Family | Weights loaded | Variable | Used for |
 |---|---|---|---|---|
@@ -58,11 +61,13 @@ Never from a `<link>` tag.
 
 ```ts
 // app/fonts.ts
-import { Bricolage_Grotesque, Manrope, JetBrains_Mono } from "next/font/google";
-export const display = Bricolage_Grotesque({ subsets: ["latin"], weight: ["200", "800"], variable: "--font-display" });
-export const body    = Manrope({ subsets: ["latin"], weight: ["200", "400", "800"], variable: "--font-body" });
-export const mono    = JetBrains_Mono({ subsets: ["latin"], weight: ["400", "800"], variable: "--font-mono" });
+import localFont from "next/font/local";
+export const display = localFont({ src: "../node_modules/@fontsource-variable/bricolage-grotesque/files/bricolage-grotesque-latin-wght-normal.woff2", weight: "200 800", variable: "--font-display" });
+export const body    = localFont({ src: "../node_modules/@fontsource-variable/manrope/files/manrope-latin-wght-normal.woff2", weight: "200 800", variable: "--font-body" });
+export const mono    = localFont({ src: "../node_modules/@fontsource-variable/jetbrains-mono/files/jetbrains-mono-latin-wght-normal.woff2", weight: "100 800", variable: "--font-mono" });
 ```
+
+In Tailwind: `font-display`, `font-sans` (body) and `font-mono`. The `.num` class is mono with tabular figures.
 
 Fallback stacks (in `globals.css`):
 `--font-display: "Bricolage Grotesque", "Helvetica Neue", sans-serif;`
@@ -77,9 +82,9 @@ Fallback stacks (in `globals.css`):
 
 ## 2. Colour
 
-All colour is CSS variables in `app/globals.css`, mapped into Tailwind in
-`tailwind.config.ts`. Components use the Tailwind names (`bg-primary`, `text-accent`),
-never raw hex.
+All colour is CSS variables in `app/globals.css`, mapped into Tailwind v4 with `@theme inline`
+in the same file (there is no `tailwind.config.ts`). Components use the Tailwind names
+(`bg-primary`, `text-signal`), never raw hex.
 
 ### 2.1 Brand: one dominant, one accent
 
@@ -87,10 +92,13 @@ never raw hex.
 |---|---|---|---|
 | `--primary` | `#1f3a68` Fjord blue | `#8fb0e6` | **Dominant.** Header band, primary buttons, active tab, links, chart axis emphasis |
 | `--primary-foreground` | `#ffffff` | `#0d1726` | Text on primary |
-| `--accent` | `#b3261e` Flag red | `#ef6b62` | **Single accent.** One thing per screen that needs attention: the VDOT figure, the active plan, a destructive confirm, an error |
-| `--accent-foreground` | `#ffffff` | `#1a0605` | Text on accent |
+| `--signal` | `#b3261e` Flag red | `#ef6b62` | **Single accent.** One thing per screen that needs attention: the VDOT figure, an eyebrow, an error |
+| `--signal-foreground` | `#ffffff` | `#1a0605` | Text on the signal colour |
 
-Rule: at most **one accent use per viewport**. If two things want red, one of them
+The brand accent is called `--signal` because shadcn/ui reserves `--accent` for neutral hover
+surfaces. `--accent` here is a neutral and never red. `--destructive` shares the signal value.
+
+Rule: at most **one signal use per viewport**. If two things want red, one of them
 is wrong.
 
 ### 2.2 Neutrals (tinted toward the primary, never pure mid-grey)
@@ -122,7 +130,6 @@ legends. They never colour buttons, headings or backgrounds.
 ```css
 :root { /* every token, light values */ }
 @media (prefers-color-scheme: dark) { :root:not(.light) { /* dark values */ color-scheme: dark; } }
-.dark { /* same dark values */ color-scheme: dark; }
 body { background: var(--background); color: var(--foreground); }
 ```
 
@@ -156,7 +163,10 @@ near-identical sizes.
 - Headings get `text-wrap: balance`. Running text is capped at `max-w-[65ch]`.
 - On screens under 640px, `text-hero` drops to 96px and `text-display` to 32px. Weights stay the same.
 
-Tailwind:
+Tailwind v4 theme (in `app/globals.css`): `--text-meta`, `--text-body`, `--text-display` and
+`--text-hero`, giving `text-meta`, `text-body`, `text-display` and `text-hero`. shadcn's in-between
+weights are mapped onto the extremes (`font-medium` = 400; `font-semibold` and `font-bold` = 800),
+so primitives obey the rule without being forked. Equivalent v3 config, for reference:
 
 ```ts
 fontSize: {
@@ -198,8 +208,8 @@ Every margin, padding, gap and fixed size is a multiple of 8px.
 
 ### 5.1 shadcn/ui primitives
 
-Not installed yet (no `components.json`). Install with the shadcn CLI on first use,
-then always import from these paths:
+Installed with the shadcn CLI (`components.json`, style new-york). Always import from these paths.
+Add new ones with `npx shadcn@4.23.0 add <name>`.
 
 | Need | Import |
 |---|---|
@@ -223,36 +233,54 @@ then always import from these paths:
 | Class merging | `import { cn } from "@/lib/utils"` |
 
 Restyle shadcn through the tokens in `globals.css`. Don't fork a primitive's markup
-to change its colour.
+to change its colour. Two local edits are allowed and already made:
+- Control heights sit on the 8px grid and are thumb-sized on phones: `button`, `input` and
+  `select` are 48px (`h-12`) below `md` and 40px (`h-10`) from `md`.
+- `sonner` follows the system theme directly (no `next-themes`).
 
-### 5.2 Real components already in this repo
+Shadows: the theme maps `shadow-xs`/`shadow-sm` to `none` and `shadow-md`/`shadow-lg`/`shadow-xl`
+to the single `--shadow-float`. Radii: every `rounded-*` step is 8px except `rounded-full`.
 
-These exist today as vanilla HTML and JS. When porting, each becomes **one**
-component at the path shown, and every screen reuses it. Never write a second version.
+### 5.2 Real components in this repo
 
-| Existing piece (where it lives today) | Next.js component (to be created) |
+These now exist in the Next.js app. Reuse them; never write a second version.
+
+| Piece (where it came from in the old site) | Next.js component |
 |---|---|
-| Header band + account chip: `.site-header`, `#user-chip` (index.html), `updateAuthUi()` (app.js) | `@/components/site-header` |
-| Home / sign-in card: `#home`, `#auth-form` (index.html), `initAuth()`, `onAuthSubmit()` (app.js) | `@/components/auth/sign-in-card` |
-| PB form + race table + training pace table: `#panel-paces` (index.html), `renderPaces()` (app.js:225) | `@/components/paces/pb-form`, `@/components/paces/race-table`, `@/components/paces/pace-table` |
-| My plans card: `#plans-card` (index.html), `loadPlanList()` (app.js:1252), `savePlan()`, `openPlan()`, `deletePlan()` | `@/components/plans/my-plans` |
-| Plan settings (collapsible): `#plan-settings` (index.html) | `@/components/builder/plan-settings` |
-| Weekly template picker: `#week-template`, `renderTemplate()` (app.js:1546) | `@/components/builder/week-template` |
-| Weekly volume chart + totals: `#volume-chart`, `renderVolumeChart()` (app.js:1435), `barPath()` (app.js:1422) | `@/components/builder/volume-chart` |
-| Week card and day cell: `.week`, `.day` markup in `renderBuilder()` (app.js:469) | `@/components/builder/week-card`, `@/components/builder/day-cell` |
-| Day action buttons (Copy / Send / COROS): `.day-actions` in `renderBuilder()` | `@/components/builder/day-actions` |
-| Connections tab: COROS card + intervals.icu form, `#panel-intervals` (index.html), `updateCorosUi()` (app.js:1074) | `@/components/connections/coros-card`, `@/components/connections/intervals-card` |
+| Header band + account chip: `.site-header`, `#user-chip` (index.html), `updateAuthUi()` (app.js) | `import { SiteHeader } from "@/components/site-header"` |
+| Home / sign-in card: `#home`, `#auth-form` (index.html), `initAuth()`, `onAuthSubmit()` (app.js) | `import { SignInCard } from "@/components/auth/sign-in-card"`, `import { HomeScreen } from "@/components/home-screen"` |
+| PB form + race table + training pace table: `#panel-paces` (index.html), `renderPaces()` (app.js:225) | `PbForm`, `RaceTable`, `PaceTable`, `PacesScreen` from `@/components/paces/*` |
+| My plans card: `#plans-card` (index.html), `loadPlanList()` (app.js:1252), `savePlan()`, `openPlan()`, `deletePlan()` | `import { MyPlans } from "@/components/plans/my-plans"` |
+| Plan settings (collapsible): `#plan-settings` (index.html) | `import { PlanSettings } from "@/components/builder/plan-settings"` |
+| Weekly template picker: `#week-template`, `renderTemplate()` (app.js:1546) | `import { WeekTemplate } from "@/components/builder/week-template"` |
+| Weekly volume chart + totals: `#volume-chart`, `renderVolumeChart()` (app.js:1435), `barPath()` (app.js:1422) | `import { VolumeChart } from "@/components/builder/volume-chart"` |
+| Week card and day cell: `.week`, `.day` markup in `renderBuilder()` (app.js:469) | `import { WeekCard } from "@/components/builder/week-card"`, `import { DayCell } from "@/components/builder/day-cell"` |
+| Day action buttons (Copy / Send / COROS): `.day-actions` in `renderBuilder()` | `import { DayActions } from "@/components/builder/day-actions"`; sending logic in `import { useSend } from "@/components/builder/use-send"` |
+| Connections tab: COROS card + intervals.icu form, `#panel-intervals` (index.html), `updateCorosUi()` (app.js:1074) | `import { CorosCard } from "@/components/connections/coros-card"`, `import { IntervalsCard } from "@/components/connections/intervals-card"` |
+| App state (settings, plan, user, COROS) | `import { useApp } from "@/components/app-provider"` |
 
 Logic moves to `lib/` with no UI in it, so components only render:
 
 | Today (app.js) | Module |
 |---|---|
-| VDOT maths (`vdotFromRace`, `raceTimeForVdot`, `paceAtPercent`), `model()` | `@/lib/vdot` |
+| VDOT maths (`vdotFromRace`, `raceTimeForVdot`, `paceAtPercent`), `model()` → `buildModel()` | `@/lib/vdot` |
+| Formatting (`fmtTime`, `rangeOf`, `dist`, dates) | `@/lib/format` |
+| Settings type, defaults, storage, template warnings | `@/lib/settings` |
 | `volumePlan()`, `repCounts()`, `buildSession()`, `buildPlan()`, `sessionSeconds()` | `@/lib/plan` |
 | `workoutText()`, `copyText()` | `@/lib/workout-text` |
 | `icuDescription()`, `icuEvent()`, `icuCall()` | `@/lib/intervals` |
 | `corosCourse()`, direct COROS OAuth + MCP client | `@/lib/coros` |
 | Supabase client and plan CRUD | `@/lib/supabase` |
+
+## 5.3 Mobile
+
+- Phone first. Navigation is a fixed bottom tab bar (Paces / Plan / Connect) below `md`,
+  and top tabs from `md`. Pages pad their bottom so content clears the bar.
+- Tap targets are at least 48px on phones (control heights above).
+- Safe areas: the header pads `env(safe-area-inset-top)`, the bottom bar pads
+  `env(safe-area-inset-bottom)`, gutters use `max(16px, env(safe-area-inset-left))`.
+- Weeks are collapsible; days are full-width rows on every size, never seven squeezed columns.
+- Wide data (race table) scrolls inside its own container; the page never scrolls sideways.
 
 ---
 
