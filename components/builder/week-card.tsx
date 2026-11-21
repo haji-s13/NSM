@@ -58,7 +58,7 @@ export function WeekCard({ wk, weeks }: { wk: Week; weeks: Week[] }) {
               )}
             </div>
           </div>
-          <div className="grid gap-2 p-2 md:p-4">
+          <div className="grid gap-0.5 bg-card">
             {wk.days.map((_, i) => <DayCell key={i} wk={wk} i={i} />)}
           </div>
         </div>

@@ -39,7 +39,7 @@ export function DayCell({ wk, i }: { wk: Week; i: number }) {
   const u = settings.units;
   if (!model) return null;
   return (
-    <div className={cn("grid min-w-0 gap-2 rounded-lg p-4 md:grid-cols-[160px_minmax(0,1fr)_auto] md:items-start md:gap-6 md:px-6", CARD[d.type])}>
+    <div className={cn("grid min-w-0 gap-2 p-4 md:grid-cols-[160px_minmax(0,1fr)_auto] md:items-start md:gap-6 md:px-6", CARD[d.type])}>
       <div className="flex items-center justify-between gap-2 md:flex-col md:items-start">
         <p className="text-meta uppercase text-muted-foreground">
           {DAYS[i]} <span className="font-extralight normal-case tracking-normal">{fmtShortDate(dayDate(wk, i))}</span>
