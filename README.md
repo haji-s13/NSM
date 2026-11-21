@@ -51,8 +51,14 @@ components/     site-header, home-screen, app-provider, auth/, paces/, builder/,
 lib/            vdot, plan, settings, format, workout-text, intervals, coros, supabase
 ```
 
-## The previous static site
+## The previous static site (kept for rollback)
 
-`index.html`, `styles.css`, `app.js`, `config.js` and `vendor/` at the root are the previous
-version. GitHub Pages keeps serving them until the Pages source is switched to GitHub Actions.
-After that they can be deleted.
+`index.html`, `styles.css`, `app.js`, `config.js` and `vendor/` at the repo root are the previous
+plain HTML/CSS/JS version. They're kept on purpose so you can switch back at any time:
+
+- **Use the Next.js app:** Settings → Pages → Source: **GitHub Actions** (built by `deploy.yml`).
+- **Go back to the old site:** Settings → Pages → Source: **Deploy from a branch**, branch `main`,
+  folder `/ (root)`. GitHub then serves the root `index.html` again. The workflow keeps running on
+  pushes but doesn't change what's live while Pages is set to deploy from a branch.
+
+Both versions share saved settings in the browser and the same Supabase plans table.
