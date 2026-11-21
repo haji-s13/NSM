@@ -73,6 +73,7 @@ export function MyPlans() {
         <h2 className="font-black">My plans</h2>
         {currentPlan && <p className="font-extralight text-muted-foreground">Editing “{currentPlan.name}”</p>}
       </div>
+      <p className="-mt-2 font-extralight text-muted-foreground">Each plan saves your run plan and HYROX plan together, with one start date.</p>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
         <div className="flex min-w-0 flex-1 flex-col gap-2">
           <Label htmlFor="plan-name">Plan name</Label>

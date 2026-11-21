@@ -44,7 +44,7 @@ export function icuDescription(wk: Week, d: Session, u: Units, p: Paces): string
 }
 
 export interface IcuEvent {
-  category: "WORKOUT"; type: "Run"; start_date_local: string; name: string;
+  category: "WORKOUT"; type: "Run" | "WeightTraining"; start_date_local: string; name: string;
   description: string; external_id: string; moving_time: number;
 }
 

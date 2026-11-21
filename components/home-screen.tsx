@@ -20,9 +20,10 @@ export function HomeScreen() {
         <ul className="grid gap-2 sm:grid-cols-2">
           {[
             ["Paces", "15k, half and 30k bands from your VDOT"],
-            ["Plan", "Base, build, peak and a taper week"],
+            ["Run plan", "Base, build, peak and a taper week"],
+            ["HYROX", "12 weeks of stations, extra work on your weak ones"],
             ["Watch", "Send to COROS or intervals.icu"],
-            ["Profile", "Save plans and open them anywhere"],
+            ["Profile", "Save both plans and open them anywhere"],
           ].map(([k, v]) => (
             <li key={k} className="flex flex-col border-t pt-2">
               <span className="font-black">{k}</span>
