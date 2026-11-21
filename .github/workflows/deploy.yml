@@ -9,6 +9,7 @@ permissions:
   contents: read
   pages: write
   id-token: write
+  actions: read
 
 concurrency:
   group: pages
@@ -39,21 +40,32 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      # Pages must publish from this workflow, not from the branch. If it's still
-      # set to "Deploy from a branch", GitHub also publishes the old static site on
-      # every push and the two race. Switch it once; harmless if already set, and
-      # if the token isn't allowed to change it the deploy still continues.
-      - name: Make GitHub Actions the Pages source
+      # While Settings → Pages → Source is "Deploy from a branch", GitHub also
+      # publishes the old static site from main on every push, and whichever
+      # deploy finishes last is what's live. Wait for that branch build to
+      # finish so this deploy always lands last. Once the source is
+      # "GitHub Actions" there's no branch build and this skips straight on.
+      # (The workflow token can read but not change that setting.)
+      - name: Wait for any branch-based Pages build
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
         run: |
-          current=$(gh api "repos/${{ github.repository }}/pages" --jq .build_type || echo unknown)
-          echo "Pages build_type: $current"
-          if [ "$current" != "workflow" ]; then
-            gh api -X PUT "repos/${{ github.repository }}/pages" -f build_type=workflow \
-              && echo "Switched Pages source to GitHub Actions." \
-              || echo "::warning::Couldn't switch Pages source. Set Settings → Pages → Source to GitHub Actions."
-          fi
+          type=$(gh api "repos/$REPO/pages" --jq .build_type || echo unknown)
+          echo "Pages source: $type"
+          if [ "$type" = "workflow" ]; then exit 0; fi
+          echo "::warning::Pages still deploys from a branch. Set Settings → Pages → Source to GitHub Actions to stop the old site being republished."
+          for i in $(seq 1 45); do
+            runs=$(gh api "repos/$REPO/actions/runs?head_sha=$SHA&per_page=50" \
+              --jq '[.workflow_runs[] | select(.name == "pages build and deployment")]')
+            total=$(echo "$runs" | jq length)
+            pending=$(echo "$runs" | jq '[.[] | select(.status != "completed")] | length')
+            if [ "$total" -gt 0 ] && [ "$pending" -eq 0 ]; then echo "Branch build finished; deploying after it."; exit 0; fi
+            if [ "$total" -eq 0 ] && [ "$i" -ge 12 ]; then echo "No branch build for this commit."; exit 0; fi
+            sleep 10
+          done
+          echo "Timed out waiting for the branch build; deploying anyway."
       - id: deployment
         uses: actions/deploy-pages@v4
