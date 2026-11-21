@@ -4,6 +4,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  # While Pages is still set to "Deploy from a branch", GitHub also publishes the
+  # old static site on every push. page_build fires when that finishes, so this
+  # redeploys the Next.js app afterwards and it always ends up live.
+  # (Once Pages → Source is "GitHub Actions", page_build no longer fires.)
+  page_build:
 
 permissions:
   contents: read
