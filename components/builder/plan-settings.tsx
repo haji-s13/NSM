@@ -49,11 +49,6 @@ export function PlanSettings() {
       </CollapsibleTrigger>
       <CollapsibleContent className="flex flex-col gap-6 border-t p-4 md:p-6">
         <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-          <div className="col-span-2 md:col-span-1">
-            <Field id="start-date" label="Start" hint="week 1 Monday">
-              <Input id="start-date" type="date" value={s.startDate} onChange={(e) => update({ startDate: e.target.value })} />
-            </Field>
-          </div>
           <Field id="start-volume" label="Start volume" hint={`${unitDist(u)}/wk`}>
             <Input id="start-volume" className="num" type="number" inputMode="numeric" min={10} max={250} value={s.startVolume} onChange={(e) => update({ startVolume: num(e.target.value) })} />
           </Field>
@@ -79,12 +74,11 @@ export function PlanSettings() {
               </SelectContent>
             </Select>
           </Field>
-          <Field id="final-week" label="Week 12">
-            <Select value={s.finalWeek} onValueChange={(v) => update({ finalWeek: v as typeof s.finalWeek })}>
+          <Field id="final-week" label="Last week" hint="if no race">
+            <Select value={s.finalWeek === "race" ? "test" : s.finalWeek} onValueChange={(v) => update({ finalWeek: v as typeof s.finalWeek })}>
               <SelectTrigger id="final-week" className="w-full"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="race">Taper + race</SelectItem>
-                <SelectItem value="test">Time trial</SelectItem>
+                <SelectItem value="test">Taper + time trial</SelectItem>
                 <SelectItem value="normal">Normal week</SelectItem>
               </SelectContent>
             </Select>
@@ -92,11 +86,11 @@ export function PlanSettings() {
         </div>
         <label htmlFor="deloads" className="flex min-h-12 items-center gap-4">
           <Switch id="deloads" checked={s.deloads} onCheckedChange={(v) => update({ deloads: v })} />
-          <span>Lighter week every 4th week</span>
+          <span>Lighter week at the end of each 4-week block</span>
         </label>
         {plan && (
           <p className="max-w-[65ch] font-extralight text-muted-foreground">
-            Starts at {dist(plan.startKm, u, 0)} and {plan.peakWeek ? `reaches your ${dist(plan.peakKm, u, 0)} peak in week ${plan.peakWeek}` : `reaches ${dist(Math.max(...plan.weeks.filter((w) => !w.deload && !w.taper).map((w) => w.targetKm)), u, 0)} by week 11, short of your ${dist(plan.peakKm, u, 0)} peak at 5% a week`}. Volume rises at most 5% a week over the last full week; lighter weeks drop to 80%.
+            Starts at {dist(plan.startKm, u, 0)} and {plan.peakWeek ? `reaches your ${dist(plan.peakKm, u, 0)} peak in week ${plan.peakWeek}` : `reaches ${dist(Math.max(...plan.weeks.filter((w) => !w.deload && !w.taper && !w.vacation).map((w) => w.targetKm)), u, 0)} at most, short of your ${dist(plan.peakKm, u, 0)} peak at 5% a week`}. Volume rises at most 5% a week over the last full week; lighter weeks drop to 80%, the week before a race to 85% and race weeks to 65%. The first week back from a vacation holds instead of rising.
           </p>
         )}
       </CollapsibleContent>

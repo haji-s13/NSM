@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { buildModel, type Model } from "@/lib/vdot";
 import { buildPlan, type Plan } from "@/lib/plan";
 import { buildHyrox, type HxPlan, type HyroxSettings } from "@/lib/hyrox";
+import { buildCalendar, type Calendar } from "@/lib/calendar";
 import { loadLocal, normalizeSettings, saveLocal, type Settings } from "@/lib/settings";
 import { supabase } from "@/lib/supabase";
 import { COROS_SERVER, corosConnected, corosHandleRedirect, directCoros, type CorosClient } from "@/lib/coros";
@@ -21,6 +22,7 @@ interface AppState {
   model: Model | null;
   plan: Plan | null;
   hyrox: HxPlan;
+  calendar: Calendar;
   updateHyrox: (patch: Partial<HyroxSettings>) => void;
   screen: Screen;
   setScreen: (s: Screen) => void;
@@ -131,11 +133,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const model = useMemo(() => buildModel(settings.pbDistance, settings.pbTime, settings.paceAdjust), [settings.pbDistance, settings.pbTime, settings.paceAdjust]);
-  const plan = useMemo(() => (model ? buildPlan(settings, model) : null), [settings, model]);
-  const hyrox = useMemo(() => buildHyrox(settings.hyrox, settings.startDate), [settings.hyrox, settings.startDate]);
+  const calendar = useMemo(() => buildCalendar(settings.startDate, settings.endDate, settings.races, settings.vacations),
+    [settings.startDate, settings.endDate, settings.races, settings.vacations]);
+  const plan = useMemo(() => (model ? buildPlan(settings, model, calendar) : null), [settings, model, calendar]);
+  const hyrox = useMemo(() => buildHyrox(settings.hyrox, calendar), [settings.hyrox, calendar]);
 
   const value: AppState = {
-    ready, settings, update, replaceSettings, model, plan, hyrox, updateHyrox, screen, setScreen,
+    ready, settings, update, replaceSettings, model, plan, hyrox, calendar, updateHyrox, screen, setScreen,
     entry: user ? "account" : entry,
     enterAsGuest: () => { writeEntry("guest"); setEntryState("guest"); },
     goHome: () => { writeEntry(null); setEntryState(null); },

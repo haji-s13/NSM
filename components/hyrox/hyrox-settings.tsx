@@ -9,7 +9,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { useApp } from "@/components/app-provider";
 import { DIVISIONS, type Division, type HyroxSettings } from "@/lib/hyrox";
-import { DAYS } from "@/lib/settings";
 
 const OPEN_KEY = "nsm-hx-settings-collapsed";
 
@@ -51,17 +50,12 @@ export function HyroxSettingsCard() {
         </span>
         {!open && (
           <span className="font-extralight text-muted-foreground">
-            {div.label} · {h.strength === "build" ? "strength block" : "maintenance"} · week 12 {h.finalWeek === "race" ? `race ${DAYS[h.raceDay]}` : h.finalWeek === "test" ? "benchmark" : "normal"}
+            {div.label} · {h.strength === "build" ? "strength block" : "maintenance"}{h.weaknesses.length ? ` · ${h.weaknesses.length} weak station${h.weaknesses.length > 1 ? "s" : ""}` : ""}
           </span>
         )}
       </CollapsibleTrigger>
       <CollapsibleContent className="flex flex-col gap-6 border-t p-4 md:p-6">
         <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-          <div className="col-span-2 md:col-span-1">
-            <Field id="hx-start" label="Start" hint="shared with run plan">
-              <Input id="hx-start" type="date" value={settings.startDate} onChange={(e) => update({ startDate: e.target.value })} />
-            </Field>
-          </div>
           <Field id="hx-division" label="Division">
             <Pick id="hx-division" value={h.division} onChange={set("division")}
               options={(Object.keys(DIVISIONS) as Division[]).map((k) => [k, DIVISIONS[k].label])} />
@@ -73,25 +67,19 @@ export function HyroxSettingsCard() {
             <Pick id="hx-strength" value={h.strength} onChange={set("strength")}
               options={[["maintain", "Maintain (in season)"], ["build", "Build (off season)"]]} />
           </Field>
-          <Field id="hx-final" label="Week 12">
-            <Pick id="hx-final" value={h.finalWeek} onChange={set("finalWeek")}
-              options={[["race", "Race week"], ["test", "Benchmark tests"], ["normal", "Normal week"]]} />
+          <Field id="hx-final" label="Last week" hint="if no race">
+            <Pick id="hx-final" value={h.finalWeek === "race" ? "test" : h.finalWeek} onChange={set("finalWeek")}
+              options={[["test", "Benchmark tests"], ["normal", "Normal week"]]} />
           </Field>
-          {h.finalWeek === "race" && (
-            <Field id="hx-race-day" label="Race day">
-              <Pick id="hx-race-day" value={String(h.raceDay)} onChange={(v) => updateHyrox({ raceDay: Number(v) })}
-                options={DAYS.map((d, i) => [String(i), d] as [string, string])} />
-            </Field>
-          )}
         </div>
         <div className="flex flex-col gap-2">
           <label htmlFor="hx-deloads" className="flex min-h-12 items-center gap-4">
             <Switch id="hx-deloads" checked={h.deloads} onCheckedChange={set("deloads")} />
-            <span>Absorb weeks 4 and 8 (about 65% volume)</span>
+            <span>Absorb week at the end of each 4-week block (about 65% volume)</span>
           </label>
           <label htmlFor="hx-bench" className="flex min-h-12 items-center gap-4">
             <Switch id="hx-bench" checked={h.benchmarks} onCheckedChange={set("benchmarks")} />
-            <span>Benchmark tests in week 1, repeated in week 11</span>
+            <span>Benchmark tests in week 1, repeated in the taper week before your last race</span>
           </label>
           <label htmlFor="hx-runs" className="flex min-h-12 items-center gap-4">
             <Switch id="hx-runs" checked={h.runLegs} onCheckedChange={set("runLegs")} />

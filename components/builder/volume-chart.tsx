@@ -44,7 +44,8 @@ export function VolumeChart() {
   const total = plan.weeks.reduce((t, w) => t + w.totalKm, 0);
   const subt = plan.weeks.reduce((t, w) => t + w.subtKm, 0);
   const time = plan.weeks.reduce((t, w) => t + w.totalSec, 0);
-  const showTrial = plan.weeks[11].phaseKey === "trial";
+  const showTrial = plan.weeks.some((w) => w.phaseKey === "trial");
+  const n = plan.weeks.length;
 
   return (
     <div className="flex flex-col gap-4">
@@ -54,7 +55,7 @@ export function VolumeChart() {
             <span className="size-3 rounded-sm" style={{ background: config[k].color }} aria-hidden />{config[k].label}
           </li>
         ))}
-        <li className="flex items-center gap-2"><span className="hatch size-3 rounded-sm border border-muted-foreground" aria-hidden />Lighter week</li>
+        <li className="flex items-center gap-2"><span className="hatch size-3 rounded-sm border border-muted-foreground" aria-hidden />Lighter or taper week</li>
         <li className="flex items-center gap-2"><span className="w-4 border-t-2 border-dashed border-muted-foreground" aria-hidden />Peak target</li>
       </ul>
 
@@ -85,7 +86,7 @@ export function VolumeChart() {
               <div className="rounded-lg border bg-popover p-2 text-popover-foreground shadow-lg">
                 <p className="font-black">Week {r.wk.n} · {r.wk.phase}</p>
                 <p className="num">{dist(r.wk.totalKm, u, 0)} · ~{fmtDuration(r.wk.totalSec)}</p>
-                <p className="text-muted-foreground">{r.wk.deload ? "Lighter week" : ch !== null ? `${ch > 0 ? "+" : ""}${ch}% vs last full week` : r.wk.taper ? "Taper week" : "First week"}</p>
+                <p className="text-muted-foreground">{r.wk.vacation ? "Vacation week" : r.wk.deload ? "Lighter week" : ch !== null ? `${ch > 0 ? "+" : ""}${ch}% vs last full week` : r.wk.taper ? "Taper week" : "First week"}</p>
               </div>
             );
           }} />
@@ -96,8 +97,8 @@ export function VolumeChart() {
               const d = barPath(x, y, width, height);
               return (
                 <g>
-                  <path d={d} fill={`var(--phase-${payload.wk.phaseKey})`} />
-                  {payload.wk.deload && <path d={d} fill="url(#hatch-lighter)" />}
+                  <path d={d} fill={payload.wk.vacation ? "var(--muted-foreground)" : `var(--phase-${payload.wk.phaseKey})`} opacity={payload.wk.vacation ? 0.35 : 1} />
+                  {(payload.wk.deload || payload.wk.taper && payload.wk.phaseKey !== "trial") && <path d={d} fill="url(#hatch-lighter)" />}
                 </g>
               );
             }}>
@@ -109,9 +110,9 @@ export function VolumeChart() {
 
       <dl className="grid grid-cols-2 gap-4 border-t pt-4 md:grid-cols-4">
         {[
-          ["12-week total", dist(total, u, 0)],
-          ["Weekly average", dist(total / 12, u, 0)],
-          ["Avg time / week", fmtDuration(time / 12)],
+          [`${n}-week total`, dist(total, u, 0)],
+          ["Weekly average", dist(total / n, u, 0)],
+          ["Avg time / week", fmtDuration(time / n)],
           ["Sub-T reps", `${dist(subt, u, 0)} · ${Math.round((subt / total) * 100)}%`],
         ].map(([k, v]) => (
           <div key={k} className="min-w-0">

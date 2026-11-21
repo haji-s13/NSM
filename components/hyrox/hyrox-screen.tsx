@@ -5,6 +5,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useApp } from "@/components/app-provider";
 import { MyPlans } from "@/components/plans/my-plans";
+import { SeasonCard } from "@/components/plans/season-card";
+import { BlockHeading } from "@/components/plans/block-heading";
 import { hxCsv, linkWarnings } from "@/lib/hyrox";
 import { DAYS, QUALITY } from "@/lib/settings";
 import { HyroxSettingsCard } from "./hyrox-settings";
@@ -27,7 +29,7 @@ export function HyroxScreen() {
     const blob = new Blob([hxCsv(hyrox)], { type: "text/csv" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = "hyrox-12-week-plan.csv";
+    a.download = "hyrox-plan.csv";
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   }
@@ -37,11 +39,12 @@ export function HyroxScreen() {
       <section className="flex flex-col gap-2">
         <h1 className="font-display text-[2rem] leading-10 font-black md:text-display">HYROX stations</h1>
         <p className="max-w-[65ch] text-muted-foreground">
-          12 weeks of station and strength work: strength, station build, then race specific, with absorb weeks and a race-week taper. Running stays in your run plan, on the same dates.
+          {hyrox.weeks.length} weeks of station and strength work in {hyrox.blocks.length} blocks: strength, station build, then race specific, with absorb weeks and a taper before each race. Running stays in your run plan, on the same dates.
         </p>
       </section>
 
       <MyPlans />
+      <SeasonCard />
       <HyroxSettingsCard />
       <WeakStations />
       <HyroxTemplateCard />
@@ -61,7 +64,12 @@ export function HyroxScreen() {
             <Button variant="outline" size="sm" disabled={busy === "hx-all"} onClick={() => sendIcu("hx-all", all, "all weeks")}><Send aria-hidden /> All to icu</Button>
           </div>
         </div>
-        {hyrox.weeks.map((wk) => <HyroxWeekCard key={wk.n} wk={wk} />)}
+        {hyrox.blocks.map((b) => (
+          <div key={b.i} className="flex flex-col gap-4">
+            <BlockHeading b={b} />
+            {b.weeks.map((wi) => <HyroxWeekCard key={wi} wk={hyrox.weeks[wi]} />)}
+          </div>
+        ))}
       </section>
     </div>
   );

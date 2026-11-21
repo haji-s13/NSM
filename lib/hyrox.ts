@@ -1,4 +1,5 @@
-import { isoDate, nextMonday, parseDate } from "./format";
+import { isoDate } from "./format";
+import { type Calendar, type CalBlock, type CalWeek, type Race } from "./calendar";
 
 /* HYROX station program (no running: that lives in the run plan).
  * Built from the coach's year of programming: strength first, then station build,
@@ -7,7 +8,7 @@ import { isoDate, nextMonday, parseDate } from "./format";
 export type Station = "ski" | "push" | "pull" | "bbj" | "row" | "farmers" | "lunges" | "wb";
 export type Division = "open-w" | "open-m" | "pro-w" | "pro-m";
 export type HxSlot = "off" | "aerobic" | "lower" | "upper" | "quality";
-export type HxDayType = HxSlot | "test" | "race" | "rest";
+export type HxDayType = HxSlot | "test" | "race" | "rest" | "vacation";
 export type WeightUnit = "kg" | "lb";
 
 /** Race order, race distance and the unit we count volume in. */
@@ -48,8 +49,7 @@ export interface HyroxSettings {
   template: HxSlot[];
   deloads: boolean;                    // absorb weeks 4 and 8
   benchmarks: boolean;                 // tests in week 1, repeated in week 11
-  finalWeek: "race" | "test" | "normal";
-  raceDay: number;                     // 0 = Mon … 6 = Sun
+  finalWeek: "race" | "test" | "normal"; // last week when no race falls in it ("race" is legacy, same as "test")
   runLegs: boolean;                    // short compromised runs inside HYROX Quality, or BikeErg instead
 }
 
@@ -63,8 +63,7 @@ export function defaultHyrox(): HyroxSettings {
     template: ["aerobic", "lower", "off", "upper", "off", "quality", "off"],
     deloads: true,
     benchmarks: true,
-    finalWeek: "race",
-    raceDay: 5,
+    finalWeek: "test",
     runLegs: false,
   };
 }
@@ -76,7 +75,7 @@ export function normalizeHyrox(raw: unknown): HyroxSettings {
   if (!Array.isArray(h.weaknesses)) h.weaknesses = d.weaknesses.slice();
   h.weaknesses = h.weaknesses.filter((w) => w in STATION);
   if (!(h.division in DIVISIONS)) h.division = d.division;
-  h.raceDay = Math.min(6, Math.max(0, Math.round(Number(h.raceDay) || 0)));
+  if (h.finalWeek === "race") h.finalWeek = "test";
   return h;
 }
 
@@ -92,7 +91,7 @@ export interface HxDay {
   min: number;
   vol: Partial<Record<Station, number>>;
 }
-export type HxKind = "bench" | "strength" | "absorb" | "build" | "peak" | "sharpen" | "race" | "test";
+export type HxKind = "bench" | "strength" | "absorb" | "build" | "peak" | "sharpen" | "race" | "test" | "vacation";
 export interface HxWeek {
   n: number;
   phase: string;
@@ -105,8 +104,11 @@ export interface HxWeek {
   totalMin: number;
   sessions: number;
   vol: Partial<Record<Station, number>>;
+  block: number;
+  pos: number;
+  raceNames: string[];
 }
-export interface HxPlan { weeks: HxWeek[]; vol: Partial<Record<Station, number>>; totalMin: number }
+export interface HxPlan { weeks: HxWeek[]; vol: Partial<Record<Station, number>>; totalMin: number; blocks: CalBlock[] }
 
 export const hxDayDate = (wk: HxWeek, i: number) => {
   const d = new Date(wk.weekStart);
@@ -116,27 +118,23 @@ export const hxDayDate = (wk: HxWeek, i: number) => {
 
 /* ---------- Periodisation ---------- */
 
-interface WeekSpec { w: number; phase: string; phaseKey: HxWeek["phaseKey"]; kind: HxKind; light: boolean; step: number; vol: number }
+interface WeekSpec { w: number; benchRepeat: boolean; phase: string; phaseKey: HxWeek["phaseKey"]; kind: HxKind; light: boolean; step: number; vol: number }
 
-function weekSpec(w: number, h: HyroxSettings): WeekSpec {
-  return { ...weekSpecBase(w, h), w } as WeekSpec;
-}
-
-function weekSpecBase(w: number, h: HyroxSettings): Omit<WeekSpec, "w"> {
-  if (w === 0 && h.benchmarks) return { phase: "Benchmark", phaseKey: "base", kind: "bench", light: false, step: 0, vol: 0.8 };
-  if (w <= 2) return { phase: "Strength", phaseKey: "base", kind: "strength", light: false, step: w, vol: [0.9, 1, 1.1][w] };
-  if (w === 3) return h.deloads
-    ? { phase: "Absorb", phaseKey: "base", kind: "absorb", light: true, step: 0, vol: 0.65 }
-    : { phase: "Strength", phaseKey: "base", kind: "strength", light: false, step: 2, vol: 1.1 };
-  if (w <= 6) return { phase: "Station build", phaseKey: "build", kind: "build", light: false, step: w - 4, vol: [1, 1.1, 1.2][w - 4] };
-  if (w === 7) return h.deloads
-    ? { phase: "Absorb", phaseKey: "build", kind: "absorb", light: true, step: 0, vol: 0.65 }
-    : { phase: "Station build", phaseKey: "build", kind: "build", light: false, step: 2, vol: 1.2 };
-  if (w <= 9) return { phase: "Race specific", phaseKey: "peak", kind: "peak", light: false, step: w - 8, vol: [1.15, 1.25][w - 8] };
-  if (w === 10) return { phase: "Sharpen", phaseKey: "peak", kind: "sharpen", light: false, step: 2, vol: 0.85 };
-  if (h.finalWeek === "race") return { phase: "Race week", phaseKey: "trial", kind: "race", light: true, step: 0, vol: 0.5 };
-  if (h.finalWeek === "test") return { phase: "Benchmark", phaseKey: "trial", kind: "test", light: true, step: 0, vol: 0.6 };
-  return { phase: "Race specific", phaseKey: "peak", kind: "peak", light: false, step: 1, vol: 1.2 };
+/** One week's job, from the shared calendar: race, taper, vacation, benchmark, absorb, or a phase week. */
+function weekSpec(cw: CalWeek, h: HyroxSettings): WeekSpec {
+  const base = { w: cw.i, benchRepeat: false };
+  const name = { base: "Strength", build: "Station build", peak: "Race specific" }[cw.phase];
+  const kindOf = { base: "strength", build: "build", peak: "peak" } as const;
+  const bump = Math.min(0.15, cw.phaseRepeat * 0.05); // later blocks of the same phase go a little bigger
+  if (cw.role === "vacation") return { ...base, phase: "Vacation", phaseKey: cw.phase, kind: "vacation", light: true, step: 0, vol: 0 };
+  if (cw.role === "race") return { ...base, phase: "Race week", phaseKey: "trial", kind: "race", light: true, step: 0, vol: 0.5 };
+  if (cw.role === "taper") return { ...base, benchRepeat: h.benchmarks && cw.finalSharpen, phase: "Sharpen", phaseKey: cw.phase, kind: "sharpen", light: false, step: 2, vol: 0.85 };
+  if (cw.i === 0 && h.benchmarks) return { ...base, phase: "Benchmark", phaseKey: cw.phase, kind: "bench", light: false, step: 0, vol: 0.8 };
+  if (cw.last && h.finalWeek !== "normal") return { ...base, phase: "Benchmark", phaseKey: "trial", kind: "test", light: true, step: 0, vol: 0.6 };
+  if (h.deloads && cw.pos === 3) return { ...base, phase: "Absorb", phaseKey: cw.phase, kind: "absorb", light: true, step: 0, vol: 0.65 };
+  const step = cw.phase === "peak" ? cw.pos % 2 : Math.min(cw.pos, 2);
+  const vols = { base: [0.9, 1, 1.1], build: [1, 1.1, 1.2], peak: [1.15, 1.25] }[cw.phase];
+  return { ...base, phase: name, phaseKey: cw.phase, kind: kindOf[cw.phase], light: false, step, vol: vols[step] + bump };
 }
 
 /* ---------- Builders ---------- */
@@ -300,7 +298,7 @@ const pick = <T,>(a: readonly T[], i: number): T => a[((i % a.length) + a.length
 /** 0 = weeks 1–4, 1 = weeks 5–8, 2 = weeks 9–12. */
 const blockOf = (c: Ctx) => (c.spec.w < 4 ? 0 : c.spec.w < 8 ? 1 : 2);
 /** Which of a phase's formats this week uses. */
-const turn = (c: Ctx) => (c.spec.kind === "absorb" ? (c.spec.w < 6 ? 0 : 1) : c.spec.step);
+const turn = (c: Ctx) => (c.spec.kind === "absorb" ? Math.floor(c.spec.w / 4) % 2 : c.spec.step);
 
 /** The main lifts stay the same all 12 weeks, as in the coach's cycles; only sets, reps and load change. */
 const LIFTS = { squat: "Box squat", bench: "Bench press", deadlift: "Deadlift" } as const;
@@ -515,11 +513,11 @@ function quality(c: Ctx): HxBlock[] {
       }
     }
   }
-  if (k === "sharpen" && c.h.benchmarks) {
+  if (k === "sharpen" && c.spec.benchRepeat) {
     c.add("ski", 2000); c.add("push", 100); c.add("pull", 100); c.add("lunges", 100); c.add("wb", 100);
     return [
       { label: "A", min: 25, text: `2 × (${c.leg(1000, "race pace")} + 1 km ski + 50 m sled push + 50 m sled pull)` },
-      { label: "Benchmark", min: 15, text: `Repeat week 1: ${c.leg(1000, "race effort")}, then 100 m lunges @ ${c.w(d.lunges)} for time, then 100 WB for time. Compare times and breaks.` },
+      { label: "Benchmark", min: 15, text: `Repeat the week 1 benchmark: ${c.leg(1000, "race effort")}, then 100 m lunges @ ${c.w(d.lunges)} for time, then 100 WB for time. Compare times and breaks.` },
     ];
   }
   if (k === "peak" && c.spec.step === 1) {
@@ -539,7 +537,7 @@ function quality(c: Ctx): HxBlock[] {
 
 const TITLES: Record<HxDayType, string> = {
   off: "No station session", aerobic: "Aerobic stations", lower: "Lower + lunges + WB", upper: "Upper + sled",
-  quality: "HYROX Quality", test: "Benchmark", race: "Race", rest: "Rest",
+  quality: "HYROX Quality", test: "Benchmark", race: "Race", rest: "Rest", vacation: "Vacation",
 };
 
 function bench(c: Ctx, slot: HxSlot): HxDay | null {
@@ -551,28 +549,37 @@ function bench(c: Ctx, slot: HxSlot): HxDay | null {
   return null;
 }
 
-/** The coach's Saturday race-week template, placed around the race day. */
-function raceWeek(c: Ctx, raceDay: number): HxDay[] {
+/** The coach's race-week template, placed around the first race of the week. Extra races that week are race days too. */
+function raceWeek(c: Ctx, races: { day: number; race: Race }[]): HxDay[] {
   const d = c.div;
   const mk = (type: HxDayType, title: string, blocks: HxBlock[], warm = true): HxDay => ({
     type, title, blocks: warm ? [WARMUP, ...blocks] : blocks, min: (warm ? 10 : 0) + blocks.reduce((t, b) => t + b.min, 0), vol: {},
   });
   const days: HxDay[] = Array.from({ length: 7 }, () => mk("off", TITLES.off, [], false));
-  const at = (off: number, day: HxDay) => { const i = raceDay + off; if (i >= 0 && i < 7) days[i] = day; };
+  const first = Math.min(...races.map((r) => r.day));
+  const at = (off: number, day: HxDay) => { const i = first + off; if (i >= 0 && i < 7) days[i] = day; };
+  const multi = races.length > 1;
   at(-5, mk("aerobic", "Recovery machines", [{ label: "Main", min: 45, text: "3 × (5 min bike, 5 min row, 5 min ski), relaxed" }], false));
   at(-4, mk("aerobic", "Easy aerobic", [{ label: "Main", min: 30, text: "30 min machine z2, or uphill walk" }], false));
-  at(-3, mk("quality", "Race-week sharpener", [
+  if (multi) at(-3, mk("aerobic", "Easy aerobic", [{ label: "Main", min: 25, text: "Easy aerobic + light weighted pull-ups. No station sharpener in a multi-race week." }], false));
+  else at(-3, mk("quality", "Race-week sharpener", [
     { label: "A", min: 20, text: `4 × (${c.leg(400, "threshold")} + 400 m ski or row @ 2k pace + 8 s), 90 s rest. Last set: + 30–40 unbroken WB.` },
     { label: "B", min: 10, text: `10 min reset, then E2MOM × 3: 10 m push + 10 m BBJ / 10 m pull + 10 walking lunges + 50 m farmers, all @ race weight. Just feel the weight.` },
   ]));
   at(-2, mk("aerobic", "Hybrid z2", [{ label: "Main", min: 30, text: "3 × (5 min bike + 5 min ski or row), easy" }], false));
   at(-1, mk("aerobic", "Primer", [{ label: "Main", min: 25, text: `20 min bike z2 + EMOM 9: 10 WB, 10 box step-downs, 5 box jumps. Nothing here should create fatigue.` }], false));
-  at(0, mk("race", "HYROX race", [
-    { label: "Warm-up", min: 45, text: `45–50 min, finishing 5–10 min before the start: easy bike ~50% FTP, mobility, then touch the stations: sled push 3–4 × 5 m (one slightly heavier), 3–4 sled pulls, BBJ 3–4 × 4, 20 m farmers, 8–10 lunges, 8–10 WB @ ${c.w(d.wb)}.` },
-    { label: "Race", min: 0, text: "Pace the first run. Lunges in 2–3 short breaks at most; wall balls in sets of 15–20 with breaks under 5 s." },
-  ], false));
-  at(1, mk("rest", "Rest", [{ label: "Recover", min: 0, text: "Take 1–2 full rest days after the race." }], false));
-  c.add("wb", 40); c.add("push", 30); c.add("pull", 30); c.add("bbj", 20); c.add("lunges", 10); c.add("farmers", 50);
+  const last = Math.max(...races.map((r) => r.day));
+  if (last + 1 < 7) days[last + 1] = mk("rest", "Rest", [{ label: "Recover", min: 0, text: "Take 1–2 full rest days after the race, then easy strength circuits and 30–60 min easy aerobic." }], false);
+  for (let i = first + 1; i < last; i++) days[i] = mk("aerobic", "Between races", [{ label: "Main", min: 25, text: "Rest completely, or 20–30 min of easy movement." }], false);
+  for (const { day, race } of races) {
+    days[day] = race.kind === "hyrox"
+      ? mk("race", race.name || "HYROX race", [
+        { label: "Warm-up", min: 45, text: `45–50 min, finishing 5–10 min before the start: easy bike ~50% FTP, mobility, then touch the stations: sled push 3–4 × 5 m (one slightly heavier), 3–4 sled pulls, BBJ 3–4 × 4, 20 m farmers, 8–10 lunges, 8–10 WB @ ${c.w(d.wb)}.` },
+        { label: "Race", min: 0, text: "Pace the first run. Lunges in 2–3 short breaks at most; wall balls in sets of 15–20 with breaks under 5 s." },
+      ], false)
+      : mk("race", race.name || "Run race", [{ label: "Race", min: 0, text: "Run race: see your run plan for the warm-up and pacing. No station work today." }], false);
+  }
+  if (races.some((r) => r.race.kind === "hyrox")) { c.add("wb", 40); c.add("push", 30); c.add("pull", 30); c.add("bbj", 20); c.add("lunges", 10); c.add("farmers", 50); }
   return days;
 }
 
@@ -586,16 +593,17 @@ function dayFor(c: Ctx, slot: HxSlot): HxDay {
   return { type: slot, title: TITLES[slot], blocks, min: 0, vol: {} };
 }
 
-export function buildHyrox(h: HyroxSettings, startDate: string): HxPlan {
-  const start = parseDate(startDate) || parseDate(nextMonday())!;
+export function buildHyrox(h: HyroxSettings, cal: Calendar): HxPlan {
   const weeks: HxWeek[] = [];
-  for (let w = 0; w < 12; w++) {
-    const spec = weekSpec(w, h);
+  for (const cw of cal.weeks) {
+    const spec = weekSpec(cw, h);
     const c = new Ctx(h, spec);
     let days: HxDay[];
-    if (spec.kind === "race") days = raceWeek(c, h.raceDay);
+    if (spec.kind === "race") days = raceWeek(c, cw.races);
+    else if (spec.kind === "vacation") days = Array.from({ length: 7 }, (): HxDay => ({ type: "off", title: TITLES.off, blocks: [], min: 0, vol: {} }));
     else {
-      days = h.template.map((slot) => {
+      days = h.template.map((slot0, i) => {
+        const slot: HxSlot = cw.off[i] ? "off" : slot0;
         const before = { ...c.vol };
         const day = dayFor(c, slot);
         day.vol = diff(c.vol, before);
@@ -628,25 +636,28 @@ export function buildHyrox(h: HyroxSettings, startDate: string): HxPlan {
         d.blocks.unshift(WARMUP);
       }
     }
+    if (cw.afterRace && days[0].type !== "race") days[0] = { type: "rest", title: "Rest", blocks: [{ label: "Recover", min: 0, text: "Recovery after yesterday's race: full rest or a 30 min light spin. Stay off the legs." }], min: 0, vol: {} };
+    // Vacation days (never a race day).
+    cw.off.forEach((off, i) => { if (off && days[i].type !== "race") days[i] = { type: "vacation", title: "Vacation", blocks: [], min: 0, vol: {} }; });
     for (const d of days) if (!d.min) d.min = d.blocks.reduce((t, b) => t + b.min, 0);
     if (spec.kind === "race") {
       // Race-week volume is mostly the race itself; attribute the touches to race day.
       const r = days.findIndex((d) => d.type === "race");
       if (r >= 0) days[r].vol = { ...c.vol };
     }
-    const weekStart = new Date(start);
-    weekStart.setDate(start.getDate() + w * 7);
+    const weekStart = cw.start;
     weeks.push({
-      n: w + 1, phase: spec.phase, phaseKey: spec.phaseKey, kind: spec.kind, light: spec.light, step: spec.step,
+      block: cw.block, pos: cw.pos, raceNames: cw.races.map((r) => r.race.name || "Race"),
+      n: cw.i + 1, phase: spec.phase, phaseKey: spec.phaseKey, kind: spec.kind, light: spec.light, step: spec.step,
       days, weekStart,
       totalMin: days.reduce((t, d) => t + (d.type === "race" ? 0 : d.min), 0),
-      sessions: days.filter((d) => d.type !== "off" && d.type !== "rest").length,
+      sessions: days.filter((d) => d.type !== "off" && d.type !== "rest" && d.type !== "vacation").length,
       vol: c.vol,
     });
   }
   const vol: Partial<Record<Station, number>> = {};
   for (const wk of weeks) for (const k of Object.keys(wk.vol) as Station[]) vol[k] = (vol[k] || 0) + wk.vol[k]!;
-  return { weeks, vol, totalMin: weeks.reduce((t, w) => t + w.totalMin, 0) };
+  return { weeks, vol, totalMin: weeks.reduce((t, w) => t + w.totalMin, 0), blocks: cal.blocks };
 }
 
 function diff(a: Partial<Record<Station, number>>, b: Partial<Record<Station, number>>) {
@@ -669,7 +680,7 @@ export function hxCsv(p: HxPlan): string {
   const rows = [["Week", "Phase", "Date", "Day", "Session", "Est. minutes", "Details"]];
   const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   p.weeks.forEach((wk) => wk.days.forEach((d, i) => {
-    if (d.type === "off") return;
+    if (d.type === "off" || d.type === "vacation") return;
     rows.push([String(wk.n), wk.phase, isoDate(hxDayDate(wk, i)), DAYS[i], d.title, d.min ? String(Math.round(d.min)) : "", d.blocks.map((b) => `${b.label}: ${b.text}`).join(" | ")]);
   }));
   return rows.map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(",")).join("\r\n");

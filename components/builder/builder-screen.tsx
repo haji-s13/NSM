@@ -10,6 +10,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useApp } from "@/components/app-provider";
 import { MyPlans } from "@/components/plans/my-plans";
+import { SeasonCard } from "@/components/plans/season-card";
+import { BlockHeading } from "@/components/plans/block-heading";
 import { corosSent, dateKey, dayItems } from "@/lib/coros";
 import { dist, isoDate } from "@/lib/format";
 import { dayDate, MIN_EASY_KM } from "@/lib/plan";
@@ -39,7 +41,7 @@ export function BuilderScreen() {
     const blob = new Blob([rows.map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(",")).join("\r\n")], { type: "text/csv" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = "norwegian-singles-12-week-plan.csv";
+    a.download = "norwegian-singles-run-plan.csv";
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   }
@@ -47,13 +49,14 @@ export function BuilderScreen() {
   return (
     <div className="flex flex-col gap-8">
       <section className="flex flex-col gap-2">
-        <h1 className="font-display text-[2rem] leading-10 font-black md:text-display">12-week plan</h1>
+        <h1 className="font-display text-[2rem] leading-10 font-black md:text-display">Run plan</h1>
         <p className="max-w-[65ch] text-muted-foreground">
-          {dist(plan.startKm, settings.units, 0)} to {dist(plan.peakKm, settings.units, 0)} a week, three sub-threshold sessions, one long run. Everything else is easy.
+          {plan.weeks.length} weeks in {plan.blocks.length} blocks, {dist(plan.startKm, settings.units, 0)} to {dist(plan.peakKm, settings.units, 0)} a week, three sub-threshold sessions, one long run. Everything else is easy.
         </p>
       </section>
 
       <MyPlans />
+      <SeasonCard />
       <PlanSettings />
 
       <WeekTemplateCard />
@@ -78,7 +81,12 @@ export function BuilderScreen() {
             )}
           </div>
         </div>
-        {plan.weeks.map((wk) => <WeekCard key={wk.n} wk={wk} weeks={plan.weeks} />)}
+        {plan.blocks.map((b) => (
+          <div key={b.i} className="flex flex-col gap-4">
+            <BlockHeading b={b} />
+            {b.weeks.map((wi) => <WeekCard key={wi} wk={plan.weeks[wi]} weeks={plan.weeks} />)}
+          </div>
+        ))}
       </section>
 
       <AlertDialog open={confirmAll} onOpenChange={setConfirmAll}>

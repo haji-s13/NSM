@@ -22,7 +22,7 @@ function barPath(x: number, y: number, w: number, h: number) {
 
 interface Row { label: string; value: number; wk: HxWeek }
 
-/** Weekly station-session hours by phase, then 12-week volume per station with weak stations marked. */
+/** Weekly station-session hours by phase, then whole-plan volume per station with weak stations marked. */
 export function HyroxChart() {
   const { hyrox, settings } = useApp();
   const [narrow, setNarrow] = useState(false);
@@ -35,7 +35,8 @@ export function HyroxChart() {
   }, []);
   const weak = settings.hyrox.weaknesses;
   const rows: Row[] = hyrox.weeks.map((wk) => ({ label: `W${wk.n}`, value: Math.round((wk.totalMin / 60) * 10) / 10, wk }));
-  const showTrial = hyrox.weeks[11].phaseKey === "trial";
+  const showTrial = hyrox.weeks.some((w) => w.phaseKey === "trial");
+  const nW = hyrox.weeks.length;
   const multiples = STATIONS.map((s) => ({ s, v: hyrox.vol[s.key] || 0, x: (hyrox.vol[s.key] || 0) / s.race }));
   const maxX = Math.max(...multiples.map((m) => m.x), 1);
 
@@ -90,7 +91,7 @@ export function HyroxChart() {
 
       <div className="flex flex-col gap-2 border-t pt-4">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h3 className="text-meta uppercase text-muted-foreground">12-week station volume</h3>
+          <h3 className="text-meta uppercase text-muted-foreground">{nW}-week station volume</h3>
           <p className="text-meta text-muted-foreground">× race distance</p>
         </div>
         <ul className="flex flex-col gap-2">
@@ -113,8 +114,8 @@ export function HyroxChart() {
 
       <dl className="grid grid-cols-2 gap-4 border-t pt-4 md:grid-cols-4">
         {[
-          ["12-week total", fmtDuration(hyrox.totalMin * 60)],
-          ["Avg time / week", fmtDuration((hyrox.totalMin * 60) / 12)],
+          [`${nW}-week total`, fmtDuration(hyrox.totalMin * 60)],
+          ["Avg time / week", fmtDuration((hyrox.totalMin * 60) / nW)],
           ["Sessions", String(hyrox.weeks.reduce((t, w) => t + w.sessions, 0))],
           ["Weak stations", weak.length ? `${weak.length} · +${settings.hyrox.emphasis === "high" ? 50 : 25}%` : "None"],
         ].map(([k, v]) => (

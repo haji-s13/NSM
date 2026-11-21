@@ -12,14 +12,14 @@ import { cn } from "@/lib/utils";
 
 /** Same tints as the run plan: easy green for aerobic, blue for strength, orange for quality, red for tests and races. */
 export const HX_CARD: Record<HxDayType, string> = {
-  off: "bg-session-rest", rest: "bg-session-rest",
+  off: "bg-session-rest", rest: "bg-session-rest", vacation: "bg-muted",
   aerobic: "bg-session-easy",
   lower: "bg-session-long", upper: "bg-session-long",
   quality: "bg-session-subt",
   test: "bg-session-race", race: "bg-session-race",
 };
 const HX_INK: Record<HxDayType, string> = {
-  off: "text-session-rest-ink", rest: "text-session-rest-ink",
+  off: "text-session-rest-ink", rest: "text-session-rest-ink", vacation: "text-muted-foreground",
   aerobic: "text-session-easy-ink",
   lower: "text-session-long-ink", upper: "text-session-long-ink",
   quality: "text-session-subt-ink",
@@ -31,7 +31,7 @@ export function HyroxDayRow({ wk, i, onIcu, busy }: { wk: HxWeek; i: number; onI
   const { plan, settings } = useApp();
   const d = wk.days[i];
   const run = plan?.weeks[wk.n - 1]?.days[i];
-  const runLine = run && run.type !== "rest" ? `${run.type === "easy" ? (run.strides ? "Easy + strides" : "Easy") : run.title} ${dist(run.km, settings.units)}` : null;
+  const runLine = run && run.type !== "rest" && run.km > 0 ? `${run.type === "easy" ? (run.strides ? "Easy + strides" : "Easy") : run.title} ${dist(run.km, settings.units)}` : null;
   const empty = d.type === "off" || !d.blocks.length;
 
   async function copy() {
@@ -46,10 +46,10 @@ export function HyroxDayRow({ wk, i, onIcu, busy }: { wk: HxWeek; i: number; onI
         <p className="text-meta uppercase text-muted-foreground">
           {DAYS[i]} <span className="font-extralight normal-case tracking-normal">{fmtShortDate(hxDayDate(wk, i))}</span>
         </p>
-        <span className={cn("rounded-full bg-card px-2 text-meta uppercase", HX_INK[d.type])}>{empty ? "No stations" : d.title}</span>
+        <span className={cn("rounded-full bg-card px-2 text-meta uppercase", HX_INK[d.type])}>{d.type === "vacation" ? "Vacation" : empty ? "No stations" : d.title}</span>
       </div>
       {empty ? (
-        <p className="text-muted-foreground md:col-span-2">{runLine ? <>Run plan: <span className="text-foreground">{runLine}</span></> : "Rest or run plan only"}</p>
+        <p className="text-muted-foreground md:col-span-2">{d.type === "vacation" ? "Time off. Enjoy it." : runLine ? <>Run plan: <span className="text-foreground">{runLine}</span></> : run?.off === "hyrox" ? "HYROX race day" : "Rest or run plan only"}</p>
       ) : (
         <>
           <div className="flex min-w-0 flex-col gap-1">
