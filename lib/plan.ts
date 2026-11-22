@@ -1,7 +1,7 @@
 import { KM_PER_MI, mid, nextMonday, parseDate, type Range } from "./format";
 import type { Model, Paces } from "./vdot";
 import { QUALITY, type Settings, type SessionType } from "./settings";
-import { PHASE_NAMES, type Calendar, type CalBlock } from "./calendar";
+import { type Calendar, type CalBlock } from "./calendar";
 
 export const MAX_WEEKLY_INCREASE = 0.05;
 export const DELOAD_FACTOR = 0.8;
@@ -24,7 +24,7 @@ const REPS = {
   hills: { min: 8, max: 25, weight: 0.6, repKm: 0.4 },
 } as const;
 
-export type Phase = "Base" | "Build" | "Peak" | "Taper" | "Race week" | "Time trial" | "Vacation";
+export type Phase = string; // "Block 2", "Taper", "Race week", "Time trial", "Vacation"
 export type PhaseKey = "base" | "build" | "peak" | "trial";
 export type DayType = SessionType | "race";
 
@@ -223,7 +223,7 @@ export function buildPlan(s: Settings, m: Model, cal: Calendar): Plan {
     days.forEach((d) => { d.sec = sessionSeconds(d, p); });
 
     const weekStart = cw.start;
-    const phase: Phase = vacation ? "Vacation" : raceWeek ? "Race week" : finalTest ? "Time trial" : preTaper ? "Taper" : PHASE_NAMES[cw.phase] as Phase;
+    const phase: Phase = vacation ? "Vacation" : raceWeek ? "Race week" : finalTest ? "Time trial" : preTaper ? "Taper" : `Block ${cw.blockInPeriod + 1}`;
     weeks.push({
       n: w + 1, phase, phaseKey: raceWeek || finalTest ? "trial" : cw.phase, deload, taper, atPeak, fmt, days, weekStart, targetKm,
       block: cw.block, pos: cw.pos, vacation, raceNames: cw.races.map((r) => r.race.name || "Race"),

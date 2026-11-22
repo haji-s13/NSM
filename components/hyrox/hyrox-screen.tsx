@@ -5,7 +5,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useApp } from "@/components/app-provider";
 import { MyPlans } from "@/components/plans/my-plans";
-import { BlockHeading } from "@/components/plans/block-heading";
+import { BlockHeading, PeriodHeading } from "@/components/plans/block-heading";
 import { hxCsv, linkWarnings } from "@/lib/hyrox";
 import { DAYS, QUALITY } from "@/lib/settings";
 import { HyroxSettingsCard } from "./hyrox-settings";
@@ -17,7 +17,7 @@ import { hxSendable, useHxSend } from "./use-hx-send";
 
 /** HYROX station program: settings, weak stations, template, chart, then the weeks. Runs stay in the run plan. */
 export function HyroxScreen() {
-  const { hyrox, settings } = useApp();
+  const { hyrox, settings, calendar } = useApp();
   const { sendIcu, busy } = useHxSend();
   const h = settings.hyrox;
   const warns = linkWarnings(h.template, settings.template, QUALITY, DAYS);
@@ -38,7 +38,7 @@ export function HyroxScreen() {
       <section className="flex flex-col gap-2">
         <h1 className="font-display text-[2rem] leading-10 font-black md:text-display">HYROX stations</h1>
         <p className="max-w-[65ch] text-muted-foreground">
-          {hyrox.weeks.length} weeks of station and strength work in {hyrox.blocks.length} blocks: strength, station build, then race specific, with absorb weeks and a taper before each race. Running stays in your run plan, on the same dates. Set dates, races and time off on Profile.
+          {hyrox.weeks.length} weeks of station and strength work in 12-week periods of three blocks: strength, station build, then race specific, with absorb weeks and a taper before each race. Running stays in your run plan, on the same dates. Set dates, races and time off on Profile.
         </p>
       </section>
 
@@ -62,10 +62,15 @@ export function HyroxScreen() {
             <Button variant="outline" size="sm" disabled={busy === "hx-all"} onClick={() => sendIcu("hx-all", all, "all weeks")}><Send aria-hidden /> All to icu</Button>
           </div>
         </div>
-        {hyrox.blocks.map((b) => (
-          <div key={b.i} className="flex flex-col gap-4">
-            <BlockHeading b={b} />
-            {b.weeks.map((wi) => <HyroxWeekCard key={wi} wk={hyrox.weeks[wi]} />)}
+        {calendar.periods.map((p) => (
+          <div key={p.i} className="flex flex-col gap-4">
+            <PeriodHeading p={p} />
+            {p.blocks.map((bi) => calendar.blocks[bi]).map((b) => (
+              <div key={b.i} className="flex flex-col gap-4">
+                <BlockHeading b={b} />
+                {b.weeks.map((wi) => <HyroxWeekCard key={wi} wk={hyrox.weeks[wi]} />)}
+              </div>
+            ))}
           </div>
         ))}
       </section>

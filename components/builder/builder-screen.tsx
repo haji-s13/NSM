@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useApp } from "@/components/app-provider";
 import { MyPlans } from "@/components/plans/my-plans";
-import { BlockHeading } from "@/components/plans/block-heading";
+import { BlockHeading, PeriodHeading } from "@/components/plans/block-heading";
 import { corosSent, dateKey, dayItems } from "@/lib/coros";
 import { dist, isoDate } from "@/lib/format";
 import { dayDate, MIN_EASY_KM } from "@/lib/plan";
@@ -23,7 +23,7 @@ import { useSend } from "./use-send";
 
 /** 12-Week Builder: plans, settings, template, the volume chart, then the weeks. */
 export function BuilderScreen() {
-  const { plan, settings, model } = useApp();
+  const { plan, settings, model, calendar } = useApp();
   const { sendIcu, sendCoros, busy, corosReady } = useSend();
   const [confirmAll, setConfirmAll] = useState(false);
   if (!plan || !model) {
@@ -50,7 +50,7 @@ export function BuilderScreen() {
       <section className="flex flex-col gap-2">
         <h1 className="font-display text-[2rem] leading-10 font-black md:text-display">Run plan</h1>
         <p className="max-w-[65ch] text-muted-foreground">
-          {plan.weeks.length} weeks in {plan.blocks.length} blocks, {dist(plan.startKm, settings.units, 0)} to {dist(plan.peakKm, settings.units, 0)} a week, three sub-threshold sessions, one long run. Everything else is easy. Set dates, races and time off on Profile.
+          {plan.weeks.length} weeks in {calendar.periods.length} period{calendar.periods.length === 1 ? "" : "s"} of 12 weeks, {dist(plan.startKm, settings.units, 0)} to {dist(plan.peakKm, settings.units, 0)} a week, three sub-threshold sessions, one long run. Everything else is easy. Set dates, races and time off on Profile.
         </p>
       </section>
 
@@ -79,10 +79,15 @@ export function BuilderScreen() {
             )}
           </div>
         </div>
-        {plan.blocks.map((b) => (
-          <div key={b.i} className="flex flex-col gap-4">
-            <BlockHeading b={b} />
-            {b.weeks.map((wi) => <WeekCard key={wi} wk={plan.weeks[wi]} weeks={plan.weeks} />)}
+        {calendar.periods.map((p) => (
+          <div key={p.i} className="flex flex-col gap-4">
+            <PeriodHeading p={p} />
+            {p.blocks.map((bi) => calendar.blocks[bi]).map((b) => (
+              <div key={b.i} className="flex flex-col gap-4">
+                <BlockHeading b={b} />
+                {b.weeks.map((wi) => <WeekCard key={wi} wk={plan.weeks[wi]} weeks={plan.weeks} />)}
+              </div>
+            ))}
           </div>
         ))}
       </section>

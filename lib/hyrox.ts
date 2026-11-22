@@ -126,7 +126,7 @@ function weekSpec(cw: CalWeek, h: HyroxSettings): WeekSpec {
   const base = { w: cw.i, benchRepeat: false };
   const name = { base: "Strength", build: "Station build", peak: "Race specific" }[cw.phase];
   const kindOf = { base: "strength", build: "build", peak: "peak" } as const;
-  const bump = Math.min(0.15, cw.phaseRepeat * 0.05); // later blocks of the same phase go a little bigger
+  const bump = Math.min(0.15, cw.phaseRepeat * 0.05); // later periods go a little bigger
   if (cw.role === "vacation") return { ...base, phase: "Vacation", phaseKey: cw.phase, kind: "vacation", light: true, step: 0, vol: 0 };
   if (cw.role === "race") return { ...base, phase: "Race week", phaseKey: "trial", kind: "race", light: true, step: 0, vol: 0.5 };
   if (cw.role === "taper") return { ...base, benchRepeat: h.benchmarks && cw.finalSharpen, phase: "Sharpen", phaseKey: cw.phase, kind: "sharpen", light: false, step: 2, vol: 0.85 };

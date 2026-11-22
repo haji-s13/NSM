@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useApp } from "@/components/app-provider";
-import { addDays, BLOCK_WEEKS, MAX_WEEKS, newId, PHASE_NAMES, type Race, type Vacation } from "@/lib/calendar";
+import { addDays, BLOCK_WEEKS, MAX_WEEKS, newId, type Race, type Vacation } from "@/lib/calendar";
 import { fmtShortDate, isoDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -40,13 +40,13 @@ export function SeasonCard() {
         </span>
         {!open && (
           <span className="font-extralight text-muted-foreground">
-            {fmtShortDate(first)} – {fmtShortDate(lastDay)} · {n} weeks · {cal.blocks.length} blocks · {cal.races.length} race{cal.races.length === 1 ? "" : "s"}
+            {fmtShortDate(first)} – {fmtShortDate(lastDay)} · {n} weeks · {cal.periods.length} period{cal.periods.length === 1 ? "" : "s"} · {cal.races.length} race{cal.races.length === 1 ? "" : "s"}
           </span>
         )}
       </CollapsibleTrigger>
       <CollapsibleContent className="flex flex-col gap-6 border-t p-4 md:p-6">
         <p className="max-w-[65ch] font-extralight text-muted-foreground">
-          Shared by the run plan and the HYROX plan, and saved with them. Weeks run Monday to Sunday in blocks of {BLOCK_WEEKS}: base, then build, then peak. Each race gets a taper week before it and a race week.
+          Shared by the run plan and the HYROX plan, and saved with them. Weeks run Monday to Sunday in blocks of {BLOCK_WEEKS}, and every three blocks make a 12-week period. Each race gets a taper week before it and a race week.
         </p>
 
         <div className="grid grid-cols-2 gap-4 md:max-w-xl">
@@ -63,25 +63,32 @@ export function SeasonCard() {
         {/* Block timeline: one cell per week, coloured by phase. */}
         <div className="flex flex-col gap-2">
           <p className="num text-muted-foreground">
-            <span className="font-black text-foreground">{n} weeks</span> · {cal.blocks.length} block{cal.blocks.length === 1 ? "" : "s"} · {fmtShortDate(first)} – {fmtShortDate(lastDay)}
+            <span className="font-black text-foreground">{n} weeks</span> · {cal.periods.length} period{cal.periods.length === 1 ? "" : "s"} · {cal.blocks.length} block{cal.blocks.length === 1 ? "" : "s"} · {fmtShortDate(first)} – {fmtShortDate(lastDay)}
             {n === MAX_WEEKS && " (the most a plan can cover)"}
           </p>
-          <div className="flex flex-wrap gap-2" aria-label="Blocks">
-            {cal.blocks.map((b) => (
-              <div key={b.i} className="flex flex-col gap-1">
-                <span className="text-meta uppercase text-muted-foreground">B{b.i + 1} · {PHASE_NAMES[b.phase]}</span>
-                <div className="flex gap-0.5">
-                  {b.weeks.map((wi) => {
-                    const w = cal.weeks[wi];
-                    return (
-                      <span key={wi} title={`Week ${wi + 1}${w.role !== "load" ? ` · ${w.role}` : ""}`}
-                        className={cn("flex h-6 w-6 items-center justify-center rounded-sm text-[10px] leading-none font-black text-white",
-                          w.role === "vacation" ? "hatch bg-muted text-muted-foreground" : w.role === "race" ? "bg-phase-trial" : `bg-phase-${b.phase}`,
-                          w.role === "taper" && "opacity-60")}>
-                        {w.role === "race" ? <Flag className="size-3" aria-hidden /> : w.role === "vacation" ? <Palmtree className="size-3" aria-hidden /> : wi + 1}
-                      </span>
-                    );
-                  })}
+          <div className="flex flex-col gap-4" aria-label="Periods and blocks">
+            {cal.periods.map((p) => (
+              <div key={p.i} className="flex flex-col gap-1">
+                <span className="text-meta uppercase text-foreground">Period {p.i + 1} <span className="font-extralight normal-case tracking-normal text-muted-foreground">· {fmtShortDate(p.start)} – {fmtShortDate(p.end)}</span></span>
+                <div className="flex flex-wrap gap-2">
+                  {p.blocks.map((bi) => cal.blocks[bi]).map((b) => (
+                    <div key={b.i} className="flex flex-col gap-1">
+                      <span className="text-meta uppercase text-muted-foreground">Block {b.pos + 1}</span>
+                      <div className="flex gap-0.5">
+                        {b.weeks.map((wi) => {
+                          const w = cal.weeks[wi];
+                          return (
+                            <span key={wi} title={`Week ${wi + 1}${w.role !== "load" ? ` · ${w.role}` : ""}`}
+                              className={cn("flex h-6 w-6 items-center justify-center rounded-sm text-[10px] leading-none font-black text-white",
+                                w.role === "vacation" ? "hatch bg-muted text-muted-foreground" : w.role === "race" ? "bg-phase-trial" : `bg-phase-${b.phase}`,
+                                w.role === "taper" && "opacity-60")}>
+                              {w.role === "race" ? <Flag className="size-3" aria-hidden /> : w.role === "vacation" ? <Palmtree className="size-3" aria-hidden /> : wi + 1}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             ))}

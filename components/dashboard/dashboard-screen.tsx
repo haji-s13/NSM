@@ -7,7 +7,7 @@ import { useApp } from "@/components/app-provider";
 import { DayCell } from "@/components/builder/day-cell";
 import { HyroxDayRow } from "@/components/hyrox/hyrox-day-row";
 import { useHxSend } from "@/components/hyrox/use-hx-send";
-import { addDays, mondayOf, PHASE_NAMES } from "@/lib/calendar";
+import { addDays, mondayOf } from "@/lib/calendar";
 import { dist, fmtDuration, isoDate, parseDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -70,7 +70,7 @@ export function DashboardScreen() {
     <div className="flex flex-col gap-8">
       <section className="flex flex-col gap-2">
         <p className="text-meta uppercase text-signal">
-          {atSel ? `Week ${atSel.w + 1} · Block ${calendar.weeks[atSel.w].block + 1} · ${PHASE_NAMES[calendar.weeks[atSel.w].phase]}` : selDate < start ? "Before your plan starts" : "After your plan ends"}
+          {atSel ? `Week ${atSel.w + 1} · Period ${calendar.weeks[atSel.w].period + 1} · Block ${calendar.weeks[atSel.w].blockInPeriod + 1}` : selDate < start ? "Before your plan starts" : "After your plan ends"}
         </p>
         <h1 className="font-display text-[2rem] leading-10 font-black md:text-display">{label}</h1>
         <p className="num text-muted-foreground">

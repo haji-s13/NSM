@@ -1,7 +1,9 @@
 import { isoDate, nextMonday, parseDate } from "./format";
 
 /* The season both plans share: build start and end, races, and time off.
- * Weeks run Monday to Sunday and group into 4-week blocks. */
+ * Weeks run Monday to Sunday, group into 4-week blocks, and blocks group into 12-week periods
+ * (three blocks each). Inside a period, block 1 lays the foundation, block 2 builds and block 3
+ * gets specific; the next period starts the cycle again a little bigger. */
 
 export type RaceKind = "hyrox" | "run";
 export interface Race { id: string; date: string; name: string; kind: RaceKind }
@@ -10,7 +12,10 @@ export interface Vacation { id: string; start: string; end: string }
 export const MIN_WEEKS = 4;
 export const MAX_WEEKS = 52;
 export const BLOCK_WEEKS = 4;
+export const PERIOD_BLOCKS = 3;
+export const PERIOD_WEEKS = BLOCK_WEEKS * PERIOD_BLOCKS;
 
+/** Internal: a block's job inside its period (1st, 2nd, 3rd block). Not shown as a name. */
 export type CalPhase = "base" | "build" | "peak";
 export type CalRole = "load" | "taper" | "race" | "vacation";
 
@@ -18,9 +23,11 @@ export interface CalWeek {
   i: number;               // 0-based week index
   start: Date;             // Monday
   block: number;           // 0-based block index
+  period: number;          // 0-based 12-week period
+  blockInPeriod: number;   // 0-2
   pos: number;             // 0-3, position in its block
-  phase: CalPhase;         // the block's phase
-  phaseRepeat: number;     // earlier blocks with the same phase
+  phase: CalPhase;         // from the block's place in its period
+  phaseRepeat: number;     // = period: later periods go a little bigger
   role: CalRole;
   races: { day: number; race: Race }[];
   off: boolean[];          // vacation days, Mon..Sun
@@ -31,10 +38,12 @@ export interface CalWeek {
   finalSharpen: boolean;
 }
 
-export interface CalBlock { i: number; phase: CalPhase; start: Date; end: Date; weeks: number[] }
-export interface Calendar { weeks: CalWeek[]; blocks: CalBlock[]; races: Race[]; outside: Race[] }
+export interface CalBlock { i: number; period: number; pos: number; phase: CalPhase; start: Date; end: Date; weeks: number[] }
+export interface CalPeriod { i: number; start: Date; end: Date; blocks: number[]; weeks: number[] }
+export interface Calendar { weeks: CalWeek[]; blocks: CalBlock[]; periods: CalPeriod[]; races: Race[]; outside: Race[] }
 
-export const PHASE_NAMES: Record<CalPhase, string> = { base: "Base", build: "Build", peak: "Peak" };
+const PHASES: CalPhase[] = ["base", "build", "peak"];
+export const blockLabel = (b: { period: number; pos: number }) => `Period ${b.period + 1} · Block ${b.pos + 1}`;
 
 /** Monday on or before a date. */
 export function mondayOf(d: Date): Date {
@@ -72,22 +81,19 @@ export function buildCalendar(startDate: string, endDate: string, races: Race[],
   }
 
   const nBlocks = Math.ceil(n / BLOCK_WEEKS);
-  const blockPhase = (b: number): CalPhase => {
-    const f = (b + 0.5) / nBlocks;
-    return f < 1 / 3 ? "base" : f < 2 / 3 ? "build" : "peak";
-  };
+  const blockPhase = (b: number): CalPhase => PHASES[b % PERIOD_BLOCKS];
 
   const weeks: CalWeek[] = [];
   for (let i = 0; i < n; i++) {
     const block = Math.floor(i / BLOCK_WEEKS);
     const phase = blockPhase(block);
-    let phaseRepeat = 0;
-    for (let b = 0; b < block; b++) if (blockPhase(b) === phase) phaseRepeat++;
+    const period = Math.floor(block / PERIOD_BLOCKS);
+    const phaseRepeat = period;
     const off = Array.from({ length: 7 }, (_, d) => offDays.has(i * 7 + d));
     const wkRaces = inside.map((race) => ({ race, d: dayIndex(start, parseDate(race.date)!) }))
       .filter(({ d }) => d >= i * 7 && d < i * 7 + 7).map(({ race, d }) => ({ day: d - i * 7, race }));
     weeks.push({
-      i, start: addDays(start, i * 7), block, pos: i % BLOCK_WEEKS, phase, phaseRepeat,
+      i, start: addDays(start, i * 7), block, period, blockInPeriod: block % PERIOD_BLOCKS, pos: i % BLOCK_WEEKS, phase, phaseRepeat,
       role: wkRaces.length ? "race" : off.filter(Boolean).length >= 5 ? "vacation" : "load",
       races: wkRaces, off, last: i === n - 1, finalSharpen: false, afterRace: !!weeks[i - 1]?.races.some((r) => r.day === 6),
     });
@@ -107,7 +113,12 @@ export function buildCalendar(startDate: string, endDate: string, races: Race[],
   const blocks: CalBlock[] = [];
   for (let b = 0; b < nBlocks; b++) {
     const ws = weeks.filter((w) => w.block === b).map((w) => w.i);
-    blocks.push({ i: b, phase: blockPhase(b), start: weeks[ws[0]].start, end: addDays(weeks[ws[ws.length - 1]].start, 6), weeks: ws });
+    blocks.push({ i: b, period: Math.floor(b / PERIOD_BLOCKS), pos: b % PERIOD_BLOCKS, phase: blockPhase(b), start: weeks[ws[0]].start, end: addDays(weeks[ws[ws.length - 1]].start, 6), weeks: ws });
   }
-  return { weeks, blocks, races: inside, outside };
+  const periods: CalPeriod[] = [];
+  for (let p = 0; p * PERIOD_BLOCKS < nBlocks; p++) {
+    const bs = blocks.filter((b) => b.period === p);
+    periods.push({ i: p, start: bs[0].start, end: bs[bs.length - 1].end, blocks: bs.map((b) => b.i), weeks: bs.flatMap((b) => b.weeks) });
+  }
+  return { weeks, blocks, periods, races: inside, outside };
 }

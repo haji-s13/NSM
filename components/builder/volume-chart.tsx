@@ -9,9 +9,9 @@ import { changeVsLastFull, type Week } from "@/lib/plan";
 import { useChartWindow } from "@/components/plans/chart-window";
 
 const config = {
-  base: { label: "Base", color: "var(--phase-base)" },
-  build: { label: "Build", color: "var(--phase-build)" },
-  peak: { label: "Peak", color: "var(--phase-peak)" },
+  base: { label: "Block 1", color: "var(--phase-base)" },
+  build: { label: "Block 2", color: "var(--phase-build)" },
+  peak: { label: "Block 3", color: "var(--phase-peak)" },
   trial: { label: "Race / trial", color: "var(--phase-trial)" },
 } satisfies ChartConfig;
 
