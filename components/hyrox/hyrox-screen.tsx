@@ -1,10 +1,10 @@
 "use client";
 
+import { SaveStatus } from "@/components/plans/save-status";
 import { Download, Send } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useApp } from "@/components/app-provider";
-import { MyPlans } from "@/components/plans/my-plans";
 import { BlockHeading, PeriodHeading } from "@/components/plans/block-heading";
 import { hxCsv, linkWarnings } from "@/lib/hyrox";
 import { BAKKEN_HARD, DAYS, QUALITY } from "@/lib/settings";
@@ -41,9 +41,9 @@ export function HyroxScreen() {
         <p className="max-w-[65ch] text-muted-foreground">
           {hyrox.weeks.length} weeks of station and strength work in 12-week periods of three blocks: strength, station build, then race specific, with absorb weeks and a taper before each race. Running stays in your run plan, on the same dates. Set dates, races and time off on Profile.
         </p>
+        <SaveStatus />
       </section>
 
-      <MyPlans />
       <HyroxSettingsCard />
       <WeakStations />
       <HyroxTemplateCard />

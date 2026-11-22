@@ -87,3 +87,14 @@ your own sessions are kept.
 
 If you change `lib/session-library.ts`, regenerate the file with `npx tsx scripts/gen-session-sql.ts`
 and run it again.
+
+## Account settings (required for saving)
+
+Signed-in users' profile, season, run plan and HYROX plan save to their account automatically.
+Guests' plans are not saved anywhere. Run [`supabase/user_settings.sql`](supabase/user_settings.sql)
+once (SQL Editor → New query → paste → Run). It creates `user_settings`, one row per account,
+with row-level security so only the owner can read or change it; guests have no access.
+
+The first time someone signs in after this, their newest plan from the old "My plans" list is
+copied into their account settings. The old `plans` table is no longer used by the app and can
+be kept or dropped.
