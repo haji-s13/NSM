@@ -8,7 +8,8 @@ import { buildPlan, type Plan } from "@/lib/plan";
 import { buildHyrox, type HxPlan, type HyroxSettings } from "@/lib/hyrox";
 import { buildCalendar, type Calendar } from "@/lib/calendar";
 import { loadLocal, normalizeSettings, saveLocal, type Settings } from "@/lib/settings";
-import { supabase } from "@/lib/supabase";
+import { fetchSessions, supabase } from "@/lib/supabase";
+import { BUILTIN_SESSIONS, type LibSession } from "@/lib/session-library";
 import { COROS_SERVER, corosConnected, corosHandleRedirect, directCoros, type CorosClient } from "@/lib/coros";
 
 export type Screen = "dashboard" | "builder" | "hyrox" | "paces";
@@ -23,6 +24,10 @@ interface AppState {
   plan: Plan | null;
   hyrox: HxPlan;
   calendar: Calendar;
+  /** HYROX session library: from Supabase when set up, else the built-in copy. */
+  library: LibSession[];
+  librarySource: "database" | "builtin";
+  refreshLibrary: () => Promise<void>;
   updateHyrox: (patch: Partial<HyroxSettings>) => void;
   screen: Screen;
   setScreen: (s: Screen) => void;
@@ -70,6 +75,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [currentPlan, setCurrentPlan] = useState<{ id: string; name: string } | null>(null);
   const [coros, setCoros] = useState<AppState["coros"]>({ client: null, source: null, server: COROS_SERVER });
   const [sentVersion, setSentVersion] = useState(0);
+  const [library, setLibrary] = useState<LibSession[]>(BUILTIN_SESSIONS);
+  const [librarySource, setLibrarySource] = useState<"database" | "builtin">("builtin");
+  const refreshLibrary = useCallback(async () => {
+    const rows = await fetchSessions().catch(() => null);
+    if (rows && rows.length) { setLibrary(rows); setLibrarySource("database"); }
+    else { setLibrary(BUILTIN_SESSIONS); setLibrarySource("builtin"); }
+  }, []);
+  // Load the library at start and again when the signed-in user changes (their own sessions).
+  useEffect(() => { refreshLibrary(); }, [refreshLibrary, user?.id]);
 
   const refreshCoros = useCallback(() => {
     setCoros((c) => (c.source === "connector" ? c
@@ -138,10 +152,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const calendar = useMemo(() => buildCalendar(settings.startDate, settings.endDate, settings.races, settings.vacations),
     [settings.startDate, settings.endDate, settings.races, settings.vacations]);
   const plan = useMemo(() => (model ? buildPlan(settings, model, calendar) : null), [settings, model, calendar]);
-  const hyrox = useMemo(() => buildHyrox(settings.hyrox, calendar), [settings.hyrox, calendar]);
+  const hyrox = useMemo(() => buildHyrox(settings.hyrox, calendar, library), [settings.hyrox, calendar, library]);
 
   const value: AppState = {
-    ready, settings, update, replaceSettings, model, plan, hyrox, calendar, updateHyrox, screen, setScreen,
+    ready, settings, update, replaceSettings, model, plan, hyrox, calendar, library, librarySource, refreshLibrary, updateHyrox, screen, setScreen,
     entry: user ? "account" : entry,
     enterAsGuest: () => { writeEntry("guest"); setEntryState("guest"); },
     goHome: () => { writeEntry(null); setEntryState(null); },

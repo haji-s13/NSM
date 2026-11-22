@@ -70,3 +70,20 @@ window.NSM_CONFIG = {
 Never use the **service_role** / secret key here: it bypasses row-level security.
 
 Commit and push, and the home page shows sign-in and create-account.
+
+## HYROX session library
+
+The HYROX plan picks its Quality (long and short) and aerobic sessions from a library. The app
+ships with a built-in copy, so it works before this step. To keep the library in your database
+and let signed-in users add their own sessions:
+
+1. Open **SQL Editor → New query**.
+2. Paste the contents of [`supabase/hyrox_sessions.sql`](supabase/hyrox_sessions.sql) and click **Run**.
+
+It creates the `hyrox_sessions` table with row-level security (everyone can read the built-in
+sessions; each signed-in person can add, edit and delete only their own) and loads the built-in
+sessions from the coach's year review. It's safe to run again: built-in sessions are updated,
+your own sessions are kept.
+
+If you change `lib/session-library.ts`, regenerate the file with `npx tsx scripts/gen-session-sql.ts`
+and run it again.

@@ -17,14 +17,14 @@ export const HX_CARD: Record<HxDayType, string> = {
   off: "bg-session-rest", rest: "bg-session-rest", vacation: "bg-muted",
   aerobic: "bg-session-easy",
   lower: "bg-session-long", upper: "bg-session-long",
-  quality: "bg-session-subt",
+  quality: "bg-session-subt", quality_short: "bg-session-subt",
   test: "bg-session-race", race: "bg-session-race",
 };
 const HX_INK: Record<HxDayType, string> = {
   off: "text-session-rest-ink", rest: "text-session-rest-ink", vacation: "text-muted-foreground",
   aerobic: "text-session-easy-ink",
   lower: "text-session-long-ink", upper: "text-session-long-ink",
-  quality: "text-session-subt-ink",
+  quality: "text-session-subt-ink", quality_short: "text-session-subt-ink",
   test: "text-session-race-ink", race: "text-session-race-ink",
 };
 

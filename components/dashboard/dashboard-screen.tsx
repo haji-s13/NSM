@@ -21,7 +21,7 @@ const RUN_DOT: Record<string, string> = {
 };
 const HX_DOT: Record<string, string> = {
   aerobic: "bg-session-easy-ink", lower: "bg-session-long-ink", upper: "bg-session-long-ink",
-  quality: "bg-session-subt-ink", test: "bg-session-race-ink", race: "bg-session-race-ink",
+  quality: "bg-session-subt-ink", quality_short: "bg-session-subt-ink", test: "bg-session-race-ink", race: "bg-session-race-ink",
 };
 
 const today = () => { const d = new Date(); d.setHours(12, 0, 0, 0); return d; };
