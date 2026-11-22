@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Settings } from "./settings";
+import type { LibSession } from "./session-library";
 
 // Public values (the publishable key is designed to ship to browsers; row-level
 // security keeps each person's plans private). Empty = guest-only.
@@ -49,4 +50,34 @@ export async function getPlan(id: string): Promise<{ id: string; name: string; s
 export async function deletePlan(id: string) {
   const { error } = await supabase()!.from("plans").delete().eq("id", id);
   if (error) throw error;
+}
+
+/* ---------- HYROX session library ---------- */
+
+const SESSION_COLS = "id,user_id,kind,name,phases,minutes,blocks,vol,source,sort";
+
+/** Built-in and (when signed in) your own sessions. Null if the table isn't set up or can't be reached. */
+export async function fetchSessions(): Promise<LibSession[] | null> {
+  const sb = supabase();
+  if (!sb) return null;
+  const { data, error } = await sb.from("hyrox_sessions").select(SESSION_COLS).order("sort").order("name");
+  if (error) return null;
+  return data as LibSession[];
+}
+export async function saveSession(s: LibSession, isNew: boolean): Promise<void> {
+  const row = { kind: s.kind, name: s.name, phases: s.phases, minutes: s.minutes, blocks: s.blocks, vol: s.vol || {}, source: s.source || null, sort: s.sort ?? 1000, updated_at: new Date().toISOString() };
+  const q = isNew ? supabase()!.from("hyrox_sessions").insert(row) : supabase()!.from("hyrox_sessions").update(row).eq("id", s.id);
+  const { error } = await q;
+  if (error) throw error;
+}
+export async function deleteSession(id: string): Promise<void> {
+  const { error } = await supabase()!.from("hyrox_sessions").delete().eq("id", id);
+  if (error) throw error;
+}
+export function sessionError(error: unknown): string {
+  const m = String((error as { message?: string })?.message || "");
+  if (/hyrox_sessions.* does not exist|could not find the table/i.test(m)) return "The session library table isn't set up yet. Run supabase/hyrox_sessions.sql in Supabase.";
+  if (/permission denied/i.test(m)) return "Your account can't change the session library. Run the grant lines from supabase/hyrox_sessions.sql.";
+  if (/JWT|expired|not authenticated/i.test(m)) return "Your sign-in has expired. Sign out and sign in again.";
+  return m || "Something went wrong with the session library.";
 }

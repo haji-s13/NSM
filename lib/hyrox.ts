@@ -1,4 +1,5 @@
 import { isoDate } from "./format";
+import { BUILTIN_SESSIONS, type LibKind, type LibPhase, type LibSession } from "./session-library";
 import { prettyText } from "./hx-format";
 import { type Calendar, type CalBlock, type CalWeek, type Race } from "./calendar";
 
@@ -8,7 +9,7 @@ import { type Calendar, type CalBlock, type CalWeek, type Race } from "./calenda
 
 export type Station = "ski" | "push" | "pull" | "bbj" | "row" | "farmers" | "lunges" | "wb";
 export type Division = "open-w" | "open-m" | "pro-w" | "pro-m";
-export type HxSlot = "off" | "aerobic" | "lower" | "upper" | "quality";
+export type HxSlot = "off" | "aerobic" | "lower" | "upper" | "quality" | "quality_short";
 export type HxDayType = HxSlot | "test" | "race" | "rest" | "vacation";
 export type WeightUnit = "kg" | "lb";
 
@@ -38,7 +39,8 @@ export const SLOT_LABELS: Record<HxSlot, string> = {
   aerobic: "Aerobic stations",
   lower: "Lower + lunges + WB",
   upper: "Upper + sled",
-  quality: "HYROX Quality",
+  quality: "HYROX Quality (long)",
+  quality_short: "HYROX Quality (short)",
 };
 
 export interface HyroxSettings {
@@ -54,6 +56,8 @@ export interface HyroxSettings {
   benchmarks: boolean;                 // tests in week 1, repeated in week 11
   finalWeek: "race" | "test" | "normal"; // last week when no race falls in it ("race" is legacy, same as "test")
   runLegs: boolean;                    // short compromised runs inside HYROX Quality, or BikeErg instead
+  /** Library sessions switched off for this plan. */
+  disabledSessions?: string[];
 }
 
 export function defaultHyrox(): HyroxSettings {
@@ -99,6 +103,8 @@ export interface HxDay {
   blocks: HxBlock[];
   min: number;
   vol: Partial<Record<Station, number>>;
+  /** Library session this day came from. */
+  libId?: string;
 }
 export type HxKind = "bench" | "strength" | "absorb" | "build" | "peak" | "sharpen" | "race" | "test" | "vacation";
 export interface HxWeek {
@@ -154,7 +160,7 @@ const KG_PER_LB = 0.45359237;
 
 class Ctx {
   vol: Partial<Record<Station, number>> = {};
-  constructor(public h: HyroxSettings, public spec: WeekSpec, public weak: Station[] = h.weaknesses) {}
+  constructor(public h: HyroxSettings, public spec: WeekSpec, public weak: Station[] = h.weaknesses, public lib: LibSession[] = BUILTIN_SESSIONS) {}
   get div() { return DIVISIONS[this.h.division]; }
   isWeak(st?: Station) { return !!st && this.weak.includes(st); }
   /** Rounds or sets scaled by the week's volume and, for weak stations, the weakness factor. */
@@ -548,7 +554,7 @@ function quality(c: Ctx): HxBlock[] {
 
 const TITLES: Record<HxDayType, string> = {
   off: "No station session", aerobic: "Aerobic stations", lower: "Lower + lunges + WB", upper: "Upper + sled",
-  quality: "HYROX Quality", test: "Benchmark", race: "Race", rest: "Rest", vacation: "Vacation",
+  quality: "HYROX Quality", quality_short: "HYROX Quality (short)", test: "Benchmark", race: "Race", rest: "Rest", vacation: "Vacation",
 };
 
 function bench(c: Ctx, slot: HxSlot): HxDay | null {
@@ -600,16 +606,66 @@ function dayFor(c: Ctx, slot: HxSlot): HxDay {
     const b = bench(c, slot);
     if (b) return b;
   }
-  const blocks = slot === "aerobic" ? aerobic(c) : slot === "lower" ? lower(c) : slot === "upper" ? upper(c) : slot === "quality" ? quality(c) : [];
+  // Quality and aerobic days come from the session library when it has a match for this phase.
+  const libKind: LibKind | null = slot === "aerobic" ? "aerobic" : slot === "quality" ? "quality_long" : slot === "quality_short" ? "quality_short" : null;
+  const keepCode = slot === "quality" && k === "sharpen" && c.spec.benchRepeat; // the benchmark repeat stays as written
+  const picked = libKind && !keepCode ? fromLibrary(c, libKind) : null;
+  if (picked) return { type: slot, title: picked.name, blocks: picked.blocks, min: 0, vol: {}, libId: picked.id };
+  const blocks = slot === "aerobic" ? aerobic(c) : slot === "lower" ? lower(c) : slot === "upper" ? upper(c) : slot === "quality" ? quality(c) : slot === "quality_short" ? shortFallback(c) : [];
   return { type: slot, title: TITLES[slot], blocks, min: 0, vol: {} };
 }
 
-export function buildHyrox(h: HyroxSettings, cal: Calendar): HxPlan {
+/** Which library phase a week draws from. */
+function libPhase(kind: HxKind): LibPhase | null {
+  return kind === "strength" ? "strength" : kind === "build" ? "build" : kind === "peak" ? "peak" : kind === "sharpen" ? "sharpen" : kind === "absorb" ? "absorb" : null;
+}
+
+/** Fill the athlete-specific placeholders in a library session. */
+function fillTemplate(c: Ctx, t: string): string {
+  const d = c.div;
+  return t.replace(/\{(\w+)(?::([^}]*))?\}/g, (all, key: string, arg = "") => {
+    if (key === "w") {
+      const m = /^(push|pull|farmers|lunges|wb|heavyball)\s*(?:([+\-*])\s*([\d.]+))?$/.exec(arg.trim());
+      if (!m) return all;
+      let kg = m[1] === "heavyball" ? d.wb + (d.wb >= 9 ? 3 : 2) : d[m[1] as "push" | "pull" | "farmers" | "lunges" | "wb"];
+      const v = Number(m[3]);
+      if (m[2] === "+") kg += v; else if (m[2] === "-") kg -= v; else if (m[2] === "*") kg *= v;
+      return c.w(kg);
+    }
+    if (key === "leg") { const [m, effort] = arg.split(":"); return c.leg(Number(m) || 400, effort || "threshold"); }
+    if (key === "n") return String(c.n(Number(arg) || 1));
+    if (key === "inc") return c.inc(Number(arg) || 5);
+    if (key === "target") return d.target;
+    return all;
+  });
+}
+
+function fromLibrary(c: Ctx, kind: LibKind): { id: string; name: string; blocks: HxBlock[] } | null {
+  const phase = libPhase(c.spec.kind);
+  if (!phase) return null;
+  const off = new Set(c.h.disabledSessions || []);
+  const match = (p: LibPhase) => c.lib.filter((x) => x.kind === kind && x.phases.includes(p) && !off.has(x.id));
+  let list = match(phase);
+  if (!list.length && phase === "sharpen") list = match("peak");
+  if (!list.length) return null;
+  const s = list[c.spec.w % list.length];
+  for (const [st, v] of Object.entries(s.vol || {}) as [Station, number][]) c.add(st, v * c.spec.vol);
+  const per = s.minutes / Math.max(1, s.blocks.length);
+  return { id: s.id, name: s.name, blocks: s.blocks.map((b) => ({ label: b.label, text: fillTemplate(c, b.text), min: per })) };
+}
+
+/** Used only if the library has no short quality session for this phase. */
+function shortFallback(c: Ctx): HxBlock[] {
+  c.add("ski", 1600); c.add("wb", 35);
+  return [{ label: "Main", min: 30, text: `4 × (${c.leg(400, "threshold")} + 400 m ski @ 2k pace + 8 s), 90 s rest. Last set: + 30–40 unbroken WB.` }];
+}
+
+export function buildHyrox(h: HyroxSettings, cal: Calendar, lib: LibSession[] = BUILTIN_SESSIONS): HxPlan {
   const weeks: HxWeek[] = [];
   for (const cw of cal.weeks) {
     const spec = weekSpec(cw, h);
     const weak = weakFor(h, cw.period);
-    const c = new Ctx(h, spec, weak);
+    const c = new Ctx(h, spec, weak, lib);
     let days: HxDay[];
     if (spec.kind === "race") days = raceWeek(c, cw.races);
     else if (spec.kind === "vacation") days = Array.from({ length: 7 }, (): HxDay => ({ type: "off", title: TITLES.off, blocks: [], min: 0, vol: {} }));
@@ -702,9 +758,10 @@ export function hxCsv(p: HxPlan): string {
 export function linkWarnings(hx: HxSlot[], run: string[], quality: string[], days: readonly string[]): string[] {
   const out: string[] = [];
   for (let i = 0; i < 7; i++) {
-    if (hx[i] !== "lower" && hx[i] !== "quality") continue;
+    if (hx[i] !== "lower" && hx[i] !== "quality" && hx[i] !== "quality_short") continue;
     const prev = (i + 6) % 7;
     if (quality.includes(run[prev])) out.push(`Your run plan has a sub-threshold session on ${days[prev]}, the day before ${SLOT_LABELS[hx[i]]} on ${days[i]}. Keep hard runs off the day before lower and HYROX Quality sessions.`);
   }
   return out;
 }
+
