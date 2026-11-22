@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useApp } from "@/components/app-provider";
 import { SLOT_LABELS, type HxSlot } from "@/lib/hyrox";
-import { DAYS, SESSION_LABELS } from "@/lib/settings";
+import { BAKKEN_LABELS, DAYS, SESSION_LABELS } from "@/lib/settings";
 
 const OPEN_KEY = "nsm-hx-template-collapsed";
 
@@ -38,7 +38,7 @@ export function HyroxTemplateCard() {
                   {(Object.keys(SLOT_LABELS) as HxSlot[]).map((k) => <SelectItem key={k} value={k}>{SLOT_LABELS[k]}</SelectItem>)}
                 </SelectContent>
               </Select>
-              <p className="col-start-2 truncate text-meta text-muted-foreground">Run: {SESSION_LABELS[settings.template[i]].replace(/ \(.*\)/, "")}</p>
+              <p className="col-start-2 truncate text-meta text-muted-foreground">Run: {settings.runMethod === "bakken" ? BAKKEN_LABELS[settings.bakkenTemplate[i]].replace(/ \(.*\)/, "") : SESSION_LABELS[settings.template[i]].replace(/ \(.*\)/, "")}</p>
             </div>
           ))}
         </div>

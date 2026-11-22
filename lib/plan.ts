@@ -1,6 +1,6 @@
 import { KM_PER_MI, mid, nextMonday, parseDate, type Range } from "./format";
 import type { Model, Paces } from "./vdot";
-import { periodVolume, QUALITY, type Settings, type SessionType } from "./settings";
+import { BAKKEN_HARD, periodVolume, QUALITY, type BakkenSlot, type Settings, type SessionType } from "./settings";
 import { type Calendar, type CalBlock } from "./calendar";
 
 export const MAX_WEEKLY_INCREASE = 0.05;
@@ -26,7 +26,7 @@ const REPS = {
 
 export type Phase = string; // "Block 2", "Taper", "Race week", "Time trial", "Vacation"
 export type PhaseKey = "base" | "build" | "peak" | "trial";
-export type DayType = SessionType | "race";
+export type DayType = SessionType | "race" | "double" | "single" | "x";
 
 export interface Reps {
   n: number;
@@ -51,6 +51,10 @@ export interface Session {
   racePace?: number;
   raceTime?: number;
   raceLabel?: string;
+  /** Double threshold days: the afternoon session (this session is the morning one). */
+  pm?: Session;
+  /** Overrides the generated main line (used for X sessions). */
+  mainText?: string;
   /** Why a no-run day isn't a plain rest day. */
   off?: "vacation" | "hyrox";
   note?: string;
@@ -73,6 +77,8 @@ export interface Week {
   tooLow: boolean;
   /** The peak volume this week's period is building to. */
   peakKm: number;
+  /** Which run method built this week. */
+  method: "singles" | "bakken";
   period: number;
   block: number;
   pos: number;
@@ -156,9 +162,17 @@ export function buildPlan(s: Settings, m: Model, cal: Calendar): Plan {
     if (!deload && !taper && !vacation) pp.maxKm = Math.max(pp.maxKm, level);
     const fmt: "distance" | "time" = s.repFormat === "mixed" ? (w % 2 === 0 ? "distance" : "time") : s.repFormat;
 
-    const tmpl: DayType[] = s.template.slice();
+    const bakken = s.runMethod === "bakken";
+    const tmpl: DayType[] = (bakken ? s.bakkenTemplate : s.template).slice();
+    if (bakken) {
+      // Low mileage: only the first double day stays double. Lighter and taper weeks drop one afternoon session.
+      const lowKm = toKm(s.lowMileage, s);
+      const doubles = tmpl.map((t, i) => (t === "double" ? i : -1)).filter((i) => i >= 0);
+      const keepDoubles = level < lowKm || deload || preTaper ? 1 : doubles.length;
+      doubles.slice(keepDoubles).forEach((i) => { tmpl[i] = "single"; });
+    }
     const notes: (Partial<Pick<Session, "off" | "note" | "title">> | undefined)[] = Array(7).fill(undefined);
-    const isQ = (t: DayType) => QUALITY.includes(t as SessionType);
+    const isQ = (t: DayType) => QUALITY.includes(t as SessionType) || BAKKEN_HARD.includes(t as BakkenSlot);
     if (raceWeek) {
       // Race days, then: no long run, no quality within 2 days of a race or after it, at most one sharpener.
       const raceDays = cw.races.map((r) => r.day);
@@ -167,7 +181,7 @@ export function buildPlan(s: Settings, m: Model, cal: Calendar): Plan {
       for (let i = 0; i < 7; i++) {
         if (tmpl[i] === "longrun") tmpl[i] = "easy";
         if (isQ(tmpl[i])) {
-          if (!kept && first - i >= 3) kept = true;
+          if (!kept && first - i >= 3 && tmpl[i] !== "x") { kept = true; if (tmpl[i] === "double") tmpl[i] = "single"; }
           else tmpl[i] = "easy";
         }
       }
@@ -199,7 +213,11 @@ export function buildPlan(s: Settings, m: Model, cal: Calendar): Plan {
       counts[t] = Math.min(r.max, Math.max(r.min, Math.round(((budget * r.weight) / totalWeight) / perRepKm)));
     });
 
+    // Bakken: threshold work is the threshold share of the week, split over the sessions (25–40 min of reps each).
+    const bk = bakken ? bakkenSessions(tmpl, targetKm, s, p, w, cw.blockInPeriod, raceWeek || preTaper || finalTest, deload || preTaper) : null;
+
     const days: Session[] = tmpl.map((type, di): Session => {
+      if (bk && (type === "double" || type === "single" || type === "x")) return bk(type);
       if (type === "rest") return { type, title: notes[di]?.title || (notes[di]?.off === "vacation" ? "Vacation" : "Rest"), km: 0, sec: 0, off: notes[di]?.off, note: notes[di]?.note };
       if (type === "easy") return { type, title: "Easy", km: 0, sec: 0 };
       if (type === "longrun") return { type, title: "Long run", km: 0, sec: 0 };
@@ -219,6 +237,7 @@ export function buildPlan(s: Settings, m: Model, cal: Calendar): Plan {
           reps: { n, stepKm: 0.4, stepMin: 0, recS: 30, pace: p.hills, recLabel: "Rest" },
         };
       }
+      if (type === "double" || type === "single" || type === "x") return { type: "easy", title: "Easy", km: 0, sec: 0 }; // not reached
       const sub = SUBT[type];
       const n = counts[type] ?? REPS[type].min;
       const pc = p[type];
@@ -236,22 +255,22 @@ export function buildPlan(s: Settings, m: Model, cal: Calendar): Plan {
     const longRun = days.find((d) => d.type === "longrun");
     if (longRun) longRun.km = Math.min(Math.max(targetKm * 0.22, 8), 32);
 
-    const fixedKm = days.reduce((a, d) => a + d.km, 0);
+    const fixedKm = days.reduce((a, d) => a + dayKm(d), 0);
     const easyDays = days.filter((d) => d.type === "easy");
     let easyEach = easyDays.length ? (targetKm - fixedKm) / easyDays.length : 0;
     const tooLow = easyDays.length > 0 && easyEach < MIN_EASY_KM;
     easyEach = Math.max(easyEach, easyDays.length ? MIN_EASY_KM : 0);
     easyDays.forEach((d) => { d.km = easyEach; });
-    days.forEach((d) => { d.sec = sessionSeconds(d, p); });
+    days.forEach((d) => { d.sec = sessionSeconds(d, p); if (d.pm) d.pm.sec = sessionSeconds(d.pm, p); });
 
     const weekStart = cw.start;
     const phase: Phase = vacation ? "Vacation" : raceWeek ? "Race week" : finalTest ? "Time trial" : preTaper ? "Taper" : `Block ${cw.blockInPeriod + 1}`;
     weeks.push({
       n: w + 1, phase, phaseKey: raceWeek || finalTest ? "trial" : cw.phase, deload, taper, atPeak, fmt, days, weekStart, targetKm,
-      peakKm, period: cw.period, block: cw.block, pos: cw.pos, vacation, raceNames: cw.races.map((r) => r.race.name || "Race"),
-      totalKm: days.reduce((a, d) => a + d.km, 0),
-      totalSec: days.reduce((a, d) => a + d.sec, 0),
-      subtKm: days.reduce((a, d) => a + (d.repKm || 0), 0),
+      peakKm, method: bakken ? "bakken" : "singles", period: cw.period, block: cw.block, pos: cw.pos, vacation, raceNames: cw.races.map((r) => r.race.name || "Race"),
+      totalKm: days.reduce((a, d) => a + dayKm(d), 0),
+      totalSec: days.reduce((a, d) => a + d.sec + (d.pm?.sec || 0), 0),
+      subtKm: days.reduce((a, d) => a + (d.repKm || 0) + (d.pm?.repKm || 0), 0),
       tooLow,
     });
   }
@@ -273,3 +292,83 @@ export function changeVsLastFull(weeks: Week[], i: number): number | null {
   }
   return null;
 }
+
+/** A day's distance including a double day's afternoon session. */
+export const dayKm = (d: Session) => d.km + (d.pm?.km || 0);
+export const daySec = (d: Session) => d.sec + (d.pm?.sec || 0);
+
+/* ---------- Norwegian Method (Marius Bakken): double threshold days and an X session ---------- */
+
+const AM_FORMATS = [6, 8, 10, 5];                    // minutes per rep, 60 s jog
+const PM_FORMATS = [                                // rep km, jog s, min and max reps
+  { km: 1, rec: 60, lo: 6, hi: 12 },
+  { km: 0.4, rec: 30, lo: 15, hi: 25 },
+  { km: 2, rec: 60, lo: 3, hi: 6 },
+  { km: 1.2, rec: 60, lo: 5, hi: 10 },
+];
+
+function bakkenSessions(tmpl: DayType[], targetKm: number, s: Settings, p: Paces, w: number, blockInPeriod: number, nearRace: boolean, light: boolean) {
+  const wu = Math.max(0, Number(s.subtWarmupKm) || 0);
+  const cd = Math.max(0, Number(s.subtCooldownKm) || 0);
+  // Morning: controlled, half-marathon to 30k pace. Afternoon: 15k to half pace, never faster than threshold.
+  const amPace: Range = { lo: p.medium.lo, hi: p.long.hi };
+  const pmPace: Range = { lo: Math.max(p.short.lo, p.threshold.lo), hi: p.short.hi };
+  const n = tmpl.reduce((a, t) => a + (t === "double" ? 2 : t === "single" ? 1 : 0), 0) || 1;
+  const perKm = (targetKm * (Number(s.subtShare) || 25)) / 100 / n;
+  const workMin = (pace: Range) => Math.min(40, Math.max(15, (perKm * mid(pace)) / 60));
+  let k = 0; // threshold sessions so far this week: rotates the formats so no two are the same
+  const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, Math.round(v)));
+
+  const am = (title: string): Session => {
+    const step = AM_FORMATS[(w + k * 2) % AM_FORMATS.length];
+    const reps = clamp(workMin(amPace) / step, 3, 8);
+    const repKm = (reps * step * 60) / mid(amPace);
+    return { type: "single", title, sec: 0, wu, cd, repKm, km: wu + repKm + ((reps - 1) * 60) / 420 + cd,
+      reps: { n: reps, stepKm: null, stepMin: step, recS: 60, pace: amPace, recLabel: "Jog" } };
+  };
+  const pm = (): Session => {
+    const f = PM_FORMATS[(w + k * 2 + 1) % PM_FORMATS.length];
+    const reps = clamp((workMin(pmPace) * 60) / mid(pmPace) / f.km, f.lo, f.hi);
+    const repKm = reps * f.km;
+    return { type: "single", title: "PM threshold", sec: 0, wu, cd, repKm, km: wu + repKm + ((reps - 1) * f.rec) / 420 + cd,
+      reps: { n: reps, stepKm: f.km, stepMin: 0, recS: f.rec, pace: pmPace, recLabel: "Jog" } };
+  };
+  const x = (): Session => {
+    const hp = p.hills;
+    // Fewer reps on lighter weeks and at lower volume (full session from about 80 km a week).
+    const scale = (light ? 0.7 : 1) * Math.min(1, Math.max(0.5, targetKm / 80));
+    // Base blocks: short hill reps. The block before a race and the weeks around races: faster flat reps.
+    const hills = blockInPeriod < 2 && !nearRace;
+    const kind = hills ? "hills" : (["300s", "45/15", "400s"] as const)[w % 3];
+    const wuX = 3, cdX = 2;
+    if (kind === "hills") {
+      const reps = clamp(20 * scale, 8, 20), repSec = 0.2 * mid(hp) * 1.15;
+      return { type: "x", title: "X session · hills", sec: 0, wu: wuX, cd: cdX, km: wuX + reps * 0.4 + cdX,
+        mainText: `${reps} × 200 m uphill, strong and relaxed (flat-ground effort ${rangeOfPace(hp, s)}), jog down recovery`,
+        reps: { n: reps, stepKm: 0.2, stepMin: 0, recS: Math.round(repSec * 2), pace: hp, recLabel: "Jog" } };
+    }
+    if (kind === "45/15") {
+      const reps = clamp(20 * scale, 12, 20);
+      return { type: "x", title: "X session · 45/15", sec: 0, wu: wuX, cd: cdX, km: wuX + (reps * 45) / mid(hp) + (reps * 15) / 420 + cdX,
+        mainText: `${reps} × (45 s fast @ ${rangeOfPace(hp, s)} / 15 s jog), continuous`,
+        reps: { n: reps, stepKm: null, stepMin: 0.75, recS: 15, pace: hp, recLabel: "Jog" } };
+    }
+    const km = kind === "300s" ? 0.3 : 0.4;
+    const reps = clamp((kind === "300s" ? 10 : 8) * scale, 5, 10);
+    return { type: "x", title: `X session · ${km * 1000}s`, sec: 0, wu: wuX, cd: cdX, km: wuX + reps * km + (reps * (kind === "300s" ? 120 : 90)) / 420 + cdX,
+      reps: { n: reps, stepKm: km, stepMin: 0, recS: kind === "300s" ? 120 : 90, pace: hp, recLabel: "Jog" } };
+  };
+  return (type: DayType): Session => {
+    if (type === "x") return x();
+    if (type === "single") { const one = { ...am("Threshold"), type: "single" as const }; k++; return one; }
+    const morning = am("AM threshold");
+    const afternoon = pm();
+    k++;
+    return { ...morning, type: "double", title: "Double threshold", pm: afternoon };
+  };
+}
+
+const rangeOfPace = (r: Range, s: Settings) => {
+  const f = (x: number) => { const v = Math.round(s.units === "mi" ? x * KM_PER_MI : x); return `${Math.floor(v / 60)}:${String(v % 60).padStart(2, "0")}`; };
+  return `${f(r.lo)}–${f(r.hi)}/${s.units === "mi" ? "mi" : "km"}`;
+};

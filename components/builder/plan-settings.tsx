@@ -46,22 +46,27 @@ export function PlanSettings() {
         </span>
         {!open && (
           <span className="num font-extralight text-muted-foreground">
-            {calendar.periods.map((p) => { const v = periodVolume(s, p.i); return v.ramp ? `${v.start}→${v.peak}` : `${v.start}`; }).join(" · ")} {unitDist(u)} · {s.subtShare}% sub-T · WU {dist(s.subtWarmupKm, u)} · CD {dist(s.subtCooldownKm, u)}
+            {calendar.periods.map((p) => { const v = periodVolume(s, p.i); return v.ramp ? `${v.start}→${v.peak}` : `${v.start}`; }).join(" · ")} {unitDist(u)} · {s.subtShare}% {s.runMethod === "bakken" ? "threshold" : "sub-T"} · WU {dist(s.subtWarmupKm, u)} · CD {dist(s.subtCooldownKm, u)}
           </span>
         )}
       </CollapsibleTrigger>
       <CollapsibleContent className="flex flex-col gap-6 border-t p-4 md:p-6">
         <MileageByPeriod />
         <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-          <Field id="subt-share" label="Sub-T share" hint="% of volume">
+          <Field id="subt-share" label={s.runMethod === "bakken" ? "Threshold share" : "Sub-T share"} hint="% of volume">
             <Input id="subt-share" className="num" type="number" inputMode="numeric" min={10} max={35} value={s.subtShare} onChange={(e) => update({ subtShare: num(e.target.value) })} />
           </Field>
-          <Field id="warmup" label="Warm-up" hint={`${unitDist(u)} · sub-T days`}>
+          <Field id="warmup" label="Warm-up" hint={`${unitDist(u)} · ${s.runMethod === "bakken" ? "threshold" : "sub-T"} sessions`}>
             <Input id="warmup" className="num" type="number" inputMode="decimal" min={0} max={10} step={0.5} value={show(s.subtWarmupKm)} onChange={(e) => update({ subtWarmupKm: toKm(e.target.value) })} />
           </Field>
-          <Field id="cooldown" label="Cool-down" hint={`${unitDist(u)} · sub-T days`}>
+          <Field id="cooldown" label="Cool-down" hint={`${unitDist(u)} · ${s.runMethod === "bakken" ? "threshold" : "sub-T"} sessions`}>
             <Input id="cooldown" className="num" type="number" inputMode="decimal" min={0} max={10} step={0.5} value={show(s.subtCooldownKm)} onChange={(e) => update({ subtCooldownKm: toKm(e.target.value) })} />
           </Field>
+          {s.runMethod === "bakken" ? (
+            <Field id="low-mileage" label="Low mileage" hint={`below ${unitDist(u)}/wk`}>
+              <Input id="low-mileage" className="num" type="number" inputMode="numeric" min={0} max={250} value={s.lowMileage} onChange={(e) => update({ lowMileage: num(e.target.value) })} />
+            </Field>
+          ) : (
           <Field id="rep-format" label="Rep format">
             <Select value={s.repFormat} onValueChange={(v) => update({ repFormat: v as typeof s.repFormat })}>
               <SelectTrigger id="rep-format" className="w-full"><SelectValue /></SelectTrigger>
@@ -72,6 +77,7 @@ export function PlanSettings() {
               </SelectContent>
             </Select>
           </Field>
+          )}
           <Field id="final-week" label="Last week" hint="if no race">
             <Select value={s.finalWeek === "race" ? "test" : s.finalWeek} onValueChange={(v) => update({ finalWeek: v as typeof s.finalWeek })}>
               <SelectTrigger id="final-week" className="w-full"><SelectValue /></SelectTrigger>
@@ -88,7 +94,7 @@ export function PlanSettings() {
         </label>
         {plan && (
           <p className="max-w-[65ch] font-extralight text-muted-foreground">
-            Volume rises at most 5% a week over the last full week; lighter weeks drop to 80%, the week before a race to 85% and race weeks to 65%. The first week back from a vacation holds instead of rising.
+            {s.runMethod === "bakken" && `Below ${s.lowMileage} ${unitDist(u)} a week, only the first double threshold day stays double; the other becomes a single session. Lighter and taper weeks also drop one afternoon session. `}Volume rises at most 5% a week over the last full week; lighter weeks drop to 80%, the week before a race to 85% and race weeks to 65%. The first week back from a vacation holds instead of rising.
           </p>
         )}
       </CollapsibleContent>

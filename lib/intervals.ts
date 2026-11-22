@@ -26,7 +26,8 @@ const icuKm = (km: number) => `${Math.round(km * 10) / 10}km`;
 /** Workout text in intervals.icu workout-builder syntax. */
 export function icuDescription(wk: Week, d: Session, u: Units, p: Paces): string {
   const easy = icuRange(p.easy, u);
-  const out = [`Norwegian Singles · Week ${wk.n} (${wk.phase})`, ""];
+  const out = [`${wk.method === "bakken" ? "Norwegian Method" : "Norwegian Singles"} · Week ${wk.n} (${wk.phase})`, ""];
+  if (d.mainText) out.push(d.mainText, "");
   if (d.type === "easy" || d.type === "longrun") {
     out.push(`- ${d.type === "longrun" ? "Long run" : "Easy"} ${icuKm(d.km)} ${easy}`);
     if (d.strides) out.push("", "Strides 6x", `- Stride 20s ${icuPace(p.hills.lo - 15, u)} Pace`, `- Walk/jog 60s ${easy}`, "");
@@ -36,7 +37,7 @@ export function icuDescription(wk: Week, d: Session, u: Units, p: Paces): string
   if (d.type === "race") out.push(`- ${d.title} ${icuKm(d.raceKm!)} ${icuPace(d.racePace!, u)} Pace`, "");
   else if (d.reps) {
     const r = d.reps;
-    const step = r.stepKm ? (r.stepKm < 1 ? `${Math.round(r.stepKm * 1000)}mtr` : `${r.stepKm}km`) : `${r.stepMin}m`;
+    const step = r.stepKm ? (r.stepKm < 1 ? `${Math.round(r.stepKm * 1000)}mtr` : `${r.stepKm}km`) : r.stepMin < 1 ? `${Math.round(r.stepMin * 60)}s` : `${r.stepMin}m`;
     out.push(`Main Set ${r.n}x`, `- ${step} ${icuRange(r.pace, u)}`, `- ${r.recLabel} ${r.recS}s ${easy}`, "");
   }
   if (d.cd) out.push(`- Cooldown ${icuKm(d.cd)} ${easy}`);
@@ -51,10 +52,23 @@ export interface IcuEvent {
 export function icuEvent(wk: Week, i: number, u: Units, p: Paces): IcuEvent {
   const d = wk.days[i];
   const day = isoDate(dayDate(wk, i));
+  const main = d.pm ? { ...d, pm: undefined, title: "AM threshold" } : d;
   return {
-    category: "WORKOUT", type: "Run", start_date_local: `${day}T00:00:00`, name: d.title,
-    description: icuDescription(wk, d, u, p), external_id: `nsm-${day}`, moving_time: Math.round(d.sec),
+    category: "WORKOUT", type: "Run", start_date_local: `${day}T${d.pm ? "07" : "00"}:00:00`, name: main.title,
+    description: icuDescription(wk, main, u, p), external_id: `nsm-${day}`, moving_time: Math.round(main.sec),
   };
+}
+
+/** A day's workouts: one, or two on a double threshold day (the afternoon gets its own ID). */
+export function icuEvents(wk: Week, i: number, u: Units, p: Paces): IcuEvent[] {
+  const d = wk.days[i];
+  const out = [icuEvent(wk, i, u, p)];
+  if (d.pm) {
+    const day = isoDate(dayDate(wk, i));
+    out.push({ category: "WORKOUT", type: "Run", start_date_local: `${day}T17:00:00`, name: d.pm.title,
+      description: icuDescription(wk, d.pm, u, p), external_id: `nsm-${day}-pm`, moving_time: Math.round(d.pm.sec) });
+  }
+  return out;
 }
 
 async function icuCall(athleteId: string | undefined, path: string, method: string, body?: unknown) {

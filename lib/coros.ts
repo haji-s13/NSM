@@ -320,7 +320,9 @@ export const COROS_SERVER = "Claude NSM";
 export const COROS_TOOL = "createScheduledWorkout";
 
 /** One day to send, with its date. */
-export interface CorosItem { wk: Week; i: number; date: Date }
+export interface CorosItem { wk: Week; i: number; date: Date; pm?: boolean }
 export const dayItems = (wk: Week): CorosItem[] =>
-  wk.days.map((d, i) => ({ wk, i, date: dayDate(wk, i) })).filter((it) => it.wk.days[it.i].type !== "rest");
+  wk.days.flatMap((d, i): CorosItem[] => d.type === "rest" ? [] : d.pm ? [{ wk, i, date: dayDate(wk, i) }, { wk, i, date: dayDate(wk, i), pm: true }] : [{ wk, i, date: dayDate(wk, i) }]);
 export const dateKey = (d: Date) => isoDate(d);
+/** Sent-tracking key: the date, plus "-pm" for a double day's afternoon session. */
+export const itemKey = (it: CorosItem) => dateKey(it.date) + (it.pm ? "-pm" : "");

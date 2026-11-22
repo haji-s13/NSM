@@ -760,7 +760,7 @@ export function linkWarnings(hx: HxSlot[], run: string[], quality: string[], day
   for (let i = 0; i < 7; i++) {
     if (hx[i] !== "lower" && hx[i] !== "quality" && hx[i] !== "quality_short") continue;
     const prev = (i + 6) % 7;
-    if (quality.includes(run[prev])) out.push(`Your run plan has a sub-threshold session on ${days[prev]}, the day before ${SLOT_LABELS[hx[i]]} on ${days[i]}. Keep hard runs off the day before lower and HYROX Quality sessions.`);
+    if (quality.includes(run[prev])) out.push(`Your run plan has a hard run on ${days[prev]}, the day before ${SLOT_LABELS[hx[i]]} on ${days[i]}. Keep hard runs off the day before lower and HYROX Quality sessions.`);
   }
   return out;
 }

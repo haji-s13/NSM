@@ -5,6 +5,9 @@ import { isoDate, parseDate } from "./format";
 
 export type SessionType = "rest" | "easy" | "short" | "medium" | "long" | "hills" | "longrun";
 export type RepFormat = "distance" | "time" | "mixed";
+/** Run plan method: Norwegian Singles, or Marius Bakken's Norwegian Method (double threshold + X day). */
+export type RunMethod = "singles" | "bakken";
+export type BakkenSlot = "rest" | "easy" | "double" | "single" | "x" | "longrun";
 /** Last week when no race falls in it ("race" is from older saves and means the same as "test"). */
 export type FinalWeek = "race" | "test" | "normal";
 
@@ -31,6 +34,11 @@ export interface Settings {
   finalWeek: FinalWeek;
   deloads: boolean;
   template: SessionType[];
+  runMethod: RunMethod;
+  /** Bakken weekly template. */
+  bakkenTemplate: BakkenSlot[];
+  /** Bakken: below this weekly volume (display units) only the first double day stays double. */
+  lowMileage: number;
   icuAthlete?: string;
   /** HYROX station program. Shares startDate with the run plan and saves with it. */
   hyrox: HyroxSettings;
@@ -47,6 +55,17 @@ export const SESSION_LABELS: Record<SessionType, string> = {
 };
 
 export const QUALITY: SessionType[] = ["short", "medium", "long", "hills"];
+
+export const BAKKEN_LABELS: Record<BakkenSlot, string> = {
+  rest: "Rest",
+  easy: "Easy",
+  double: "Double threshold (AM + PM)",
+  single: "Threshold (single)",
+  x: "X session",
+  longrun: "Long run",
+};
+/** Bakken days that count as hard (for warnings and the HYROX link). */
+export const BAKKEN_HARD: BakkenSlot[] = ["double", "single", "x"];
 export const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 
 export function defaultSettings(): Settings {
@@ -69,6 +88,9 @@ export function defaultSettings(): Settings {
     finalWeek: "test",
     deloads: true,
     template: ["easy", "short", "easy", "medium", "easy", "long", "longrun"],
+    runMethod: "singles",
+    bakkenTemplate: ["easy", "double", "easy", "double", "easy", "x", "longrun"],
+    lowMileage: 50,
     hyrox: defaultHyrox(),
   };
 }
@@ -78,6 +100,9 @@ export function normalizeSettings(raw: unknown): Settings {
   const d = defaultSettings();
   const s = { ...d, ...(raw && typeof raw === "object" ? raw : {}) } as Settings;
   if (!Array.isArray(s.template) || s.template.length !== 7) s.template = d.template.slice();
+  if (s.runMethod !== "bakken") s.runMethod = "singles";
+  if (!Array.isArray(s.bakkenTemplate) || s.bakkenTemplate.length !== 7) s.bakkenTemplate = d.bakkenTemplate.slice();
+  if (!(Number(s.lowMileage) >= 0)) s.lowMileage = d.lowMileage;
   s.hyrox = normalizeHyrox(s.hyrox);
   // Older saves were always 12 weeks with the race in week 12.
   const raw0 = (raw && typeof raw === "object" ? raw : {}) as Partial<Settings> & { hyrox?: { finalWeek?: string; raceDay?: number } };
@@ -136,4 +161,15 @@ export function periodVolume(s: Settings, p: number): { ramp: boolean; start: nu
   if (ramp) return { ramp, start: set.start ?? Math.round(prev.peak * 0.85), peak: set.peak ?? prev.peak };
   const hold = set.start ?? prev.peak;
   return { ramp, start: hold, peak: hold };
+}
+
+export function bakkenWarnings(t: BakkenSlot[]): string[] {
+  const warns: string[] = [];
+  const hard = t.map((x) => BAKKEN_HARD.includes(x));
+  if (!t.includes("double") && !t.includes("single")) warns.push("Your template has no threshold days. The Norwegian Method is built on two double threshold days a week.");
+  if (t.filter((x) => x === "x").length > 1) warns.push("More than one X session a week. The method uses one.");
+  for (let i = 0; i < 7; i++) {
+    if (hard[i] && hard[(i + 1) % 7]) warns.push(`${DAYS[i]} and ${DAYS[(i + 1) % 7]} are back-to-back hard days. The method puts an easy day between them.`);
+  }
+  return warns;
 }

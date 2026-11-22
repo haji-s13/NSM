@@ -6,26 +6,28 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useApp } from "@/components/app-provider";
-import { DAYS, SESSION_LABELS, type SessionType } from "@/lib/settings";
+import { BAKKEN_LABELS, DAYS, SESSION_LABELS, type BakkenSlot, type SessionType } from "@/lib/settings";
 
 /** Which session goes on which day. */
 export function WeekTemplate() {
   const { settings, update } = useApp();
-  const set = (i: number, v: SessionType) => {
-    const t = settings.template.slice();
-    t[i] = v;
-    update({ template: t });
+  const bakken = settings.runMethod === "bakken";
+  const current: string[] = bakken ? settings.bakkenTemplate : settings.template;
+  const labels: Record<string, string> = bakken ? BAKKEN_LABELS : SESSION_LABELS;
+  const set = (i: number, v: string) => {
+    if (bakken) { const t = settings.bakkenTemplate.slice(); t[i] = v as BakkenSlot; update({ bakkenTemplate: t }); }
+    else { const t = settings.template.slice(); t[i] = v as SessionType; update({ template: t }); }
   };
   return (
     <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-7 lg:gap-4">
       {DAYS.map((d, i) => (
         <div key={d} className="grid grid-cols-[48px_minmax(0,1fr)] items-center gap-2 lg:flex lg:flex-col lg:items-stretch">
           <Label htmlFor={`tmpl-${i}`} className="text-meta uppercase text-muted-foreground">{d}</Label>
-          <Select value={settings.template[i]} onValueChange={(v) => set(i, v as SessionType)}>
+          <Select value={current[i]} onValueChange={(v) => set(i, v)}>
             <SelectTrigger id={`tmpl-${i}`} className="w-full"><SelectValue /></SelectTrigger>
             <SelectContent>
-              {(Object.keys(SESSION_LABELS) as SessionType[]).map((k) => (
-                <SelectItem key={k} value={k}>{SESSION_LABELS[k]}</SelectItem>
+              {Object.keys(labels).map((k) => (
+                <SelectItem key={k} value={k}>{labels[k]}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -51,7 +53,9 @@ export function WeekTemplateCard() {
       </CollapsibleTrigger>
       <CollapsibleContent className="flex flex-col gap-4 border-t p-4 md:p-6">
         <WeekTemplate />
-        <p className="font-extralight text-muted-foreground">Put an easy day between sub-threshold sessions. Most of your volume should be easy running.</p>
+        <p className="font-extralight text-muted-foreground">{useApp().settings.runMethod === "bakken"
+          ? "Double threshold days run a controlled morning session and a slightly faster afternoon one. Keep easy days between hard days; most of your volume is easy running."
+          : "Put an easy day between sub-threshold sessions. Most of your volume should be easy running."}</p>
       </CollapsibleContent>
     </Collapsible>
   );
