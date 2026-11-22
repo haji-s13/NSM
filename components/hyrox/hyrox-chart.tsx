@@ -36,7 +36,7 @@ export function HyroxChart() {
   }, []);
   const win = useChartWindow(hyrox.weeks);
   const shown = hyrox.weeks.slice(win.start, win.end);
-  const weak = settings.hyrox.weaknesses;
+  const weak = [...new Set(shown.flatMap((w) => w.weak))];
   const rows: Row[] = shown.map((wk) => ({ label: `W${wk.n}`, value: Math.round((wk.totalMin / 60) * 10) / 10, wk }));
   const showTrial = shown.some((w) => w.phaseKey === "trial");
   const nW = shown.length;

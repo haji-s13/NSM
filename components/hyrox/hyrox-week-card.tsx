@@ -19,7 +19,7 @@ export function HyroxWeekCard({ wk }: { wk: HxWeek }) {
   const { settings } = useApp();
   const { sendIcu, busy } = useHxSend();
   const [open, setOpen] = useState(wk.n <= 1);
-  const weak = settings.hyrox.weaknesses;
+  const weak = wk.weak;
   const items = hxSendable(wk);
 
   return (

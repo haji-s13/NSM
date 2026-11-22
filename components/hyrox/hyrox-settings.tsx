@@ -50,7 +50,7 @@ export function HyroxSettingsCard() {
         </span>
         {!open && (
           <span className="font-extralight text-muted-foreground">
-            {div.label} · {h.strength === "build" ? "strength block" : "maintenance"}{h.weaknesses.length ? ` · ${h.weaknesses.length} weak station${h.weaknesses.length > 1 ? "s" : ""}` : ""}
+            {div.label} · {h.strength === "build" ? "strength block" : "maintenance"}{h.weakByPeriod?.some(Boolean) ? " · weak stations by period" : h.weaknesses.length ? ` · ${h.weaknesses.length} weak station${h.weaknesses.length > 1 ? "s" : ""}` : ""}
           </span>
         )}
       </CollapsibleTrigger>

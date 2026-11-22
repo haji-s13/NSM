@@ -46,6 +46,8 @@ export interface HyroxSettings {
   weightUnit: WeightUnit;
   strength: "maintain" | "build";     // in-season maintenance cycle or off-season strength waves
   weaknesses: Station[];
+  /** Weak stations per 12-week period; a period without an entry uses `weaknesses`. */
+  weakByPeriod?: (Station[] | null)[];
   emphasis: "moderate" | "high";       // +25% or +50% on weak stations
   template: HxSlot[];
   deloads: boolean;                    // absorb weeks 4 and 8
@@ -75,9 +77,15 @@ export function normalizeHyrox(raw: unknown): HyroxSettings {
   if (!Array.isArray(h.template) || h.template.length !== 7) h.template = d.template.slice();
   if (!Array.isArray(h.weaknesses)) h.weaknesses = d.weaknesses.slice();
   h.weaknesses = h.weaknesses.filter((w) => w in STATION);
+  if (Array.isArray(h.weakByPeriod)) h.weakByPeriod = h.weakByPeriod.map((l) => (Array.isArray(l) ? l.filter((w) => w in STATION) : null));
   if (!(h.division in DIVISIONS)) h.division = d.division;
   if (h.finalWeek === "race") h.finalWeek = "test";
   return h;
+}
+
+/** Weak stations for a 12-week period (its own list, or the default). */
+export function weakFor(h: HyroxSettings, period: number): Station[] {
+  return h.weakByPeriod?.[period] ?? h.weaknesses;
 }
 
 export const WEAK_FACTOR = { moderate: 1.25, high: 1.5 } as const;
@@ -108,6 +116,8 @@ export interface HxWeek {
   block: number;
   pos: number;
   raceNames: string[];
+  /** The weak stations this week's period targets. */
+  weak: Station[];
 }
 export interface HxPlan { weeks: HxWeek[]; vol: Partial<Record<Station, number>>; totalMin: number; blocks: CalBlock[] }
 
@@ -144,9 +154,9 @@ const KG_PER_LB = 0.45359237;
 
 class Ctx {
   vol: Partial<Record<Station, number>> = {};
-  constructor(public h: HyroxSettings, public spec: WeekSpec) {}
+  constructor(public h: HyroxSettings, public spec: WeekSpec, public weak: Station[] = h.weaknesses) {}
   get div() { return DIVISIONS[this.h.division]; }
-  isWeak(st?: Station) { return !!st && this.h.weaknesses.includes(st); }
+  isWeak(st?: Station) { return !!st && this.weak.includes(st); }
   /** Rounds or sets scaled by the week's volume and, for weak stations, the weakness factor. */
   n(base: number, st?: Station, min = 1) {
     const f = this.spec.vol * (this.isWeak(st) ? WEAK_FACTOR[this.h.emphasis] : 1);
@@ -598,7 +608,8 @@ export function buildHyrox(h: HyroxSettings, cal: Calendar): HxPlan {
   const weeks: HxWeek[] = [];
   for (const cw of cal.weeks) {
     const spec = weekSpec(cw, h);
-    const c = new Ctx(h, spec);
+    const weak = weakFor(h, cw.period);
+    const c = new Ctx(h, spec, weak);
     let days: HxDay[];
     if (spec.kind === "race") days = raceWeek(c, cw.races);
     else if (spec.kind === "vacation") days = Array.from({ length: 7 }, (): HxDay => ({ type: "off", title: TITLES.off, blocks: [], min: 0, vol: {} }));
@@ -612,7 +623,7 @@ export function buildHyrox(h: HyroxSettings, cal: Calendar): HxPlan {
       });
       // Extra work for weak stations (not in benchmark weeks).
       if (spec.kind !== "bench" && spec.kind !== "test") {
-        for (const st of h.weaknesses) {
+        for (const st of weak) {
           const host = HOST[st].map((s) => days.findIndex((d) => d.type === s)).find((i) => i >= 0);
           if (host === undefined) continue;
           const before = { ...c.vol };
@@ -623,7 +634,7 @@ export function buildHyrox(h: HyroxSettings, cal: Calendar): HxPlan {
           for (const k of Object.keys(add) as Station[]) days[host].vol[k] = (days[host].vol[k] || 0) + add[k]!;
         }
         // Muscle-specific gym work for each weak station, on its strength day (or the other one).
-        for (const st of h.weaknesses) {
+        for (const st of weak) {
           const pref = ACCESSORY[st].day;
           const accCount = (i: number) => days[i].blocks.filter((x) => x.acc).length;
           const host = [pref, pref === "lower" ? "upper" : "lower"].map((s) => days.findIndex((d) => d.type === s))
@@ -648,7 +659,7 @@ export function buildHyrox(h: HyroxSettings, cal: Calendar): HxPlan {
     }
     const weekStart = cw.start;
     weeks.push({
-      block: cw.block, pos: cw.pos, raceNames: cw.races.map((r) => r.race.name || "Race"),
+      weak, block: cw.block, pos: cw.pos, raceNames: cw.races.map((r) => r.race.name || "Race"),
       n: cw.i + 1, phase: spec.phase, phaseKey: spec.phaseKey, kind: spec.kind, light: spec.light, step: spec.step,
       days, weekStart,
       totalMin: days.reduce((t, d) => t + (d.type === "race" ? 0 : d.min), 0),
