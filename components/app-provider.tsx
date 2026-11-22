@@ -6,21 +6,23 @@ import { toast } from "sonner";
 import { buildModel, type Model } from "@/lib/vdot";
 import { buildPlan, type Plan } from "@/lib/plan";
 import { buildHyrox, type HxPlan, type HyroxSettings } from "@/lib/hyrox";
+import { buildCalendar, type Calendar } from "@/lib/calendar";
 import { loadLocal, normalizeSettings, saveLocal, type Settings } from "@/lib/settings";
 import { supabase } from "@/lib/supabase";
 import { COROS_SERVER, corosConnected, corosHandleRedirect, directCoros, type CorosClient } from "@/lib/coros";
 
-export type Screen = "paces" | "builder" | "hyrox" | "connections";
+export type Screen = "dashboard" | "builder" | "hyrox" | "paces";
 type Entry = "guest" | "account" | null;
 
 interface AppState {
   ready: boolean;
   settings: Settings;
-  update: (patch: Partial<Settings>) => void;
+  update: (patch: Partial<Settings> | ((s: Settings) => Partial<Settings>)) => void;
   replaceSettings: (s: Settings) => void;
   model: Model | null;
   plan: Plan | null;
   hyrox: HxPlan;
+  calendar: Calendar;
   updateHyrox: (patch: Partial<HyroxSettings>) => void;
   screen: Screen;
   setScreen: (s: Screen) => void;
@@ -54,14 +56,14 @@ function screenFromHash(): Screen {
   const h = typeof location === "undefined" ? "" : location.hash.slice(1);
   if (h === "builder") return "builder";
   if (h === "hyrox") return "hyrox";
-  if (h === "connections" || h === "intervals") return "connections";
-  return "paces";
+  if (h === "paces" || h === "profile" || h === "connections" || h === "intervals") return "paces";
+  return "dashboard";
 }
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [settings, setSettings] = useState<Settings>(() => normalizeSettings({}));
-  const [screen, setScreenState] = useState<Screen>("paces");
+  const [screen, setScreenState] = useState<Screen>("dashboard");
   const [entry, setEntryState] = useState<Entry>(null);
   const [user, setUser] = useState<User | null>(null);
   const [recovering, setRecovering] = useState(false);
@@ -81,6 +83,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (new URLSearchParams(location.search).get("reset") === "1" || /type=recovery/.test(location.hash)) setRecovering(true);
     setSettings(loadLocal());
     setScreenState(screenFromHash());
+    if (/^#(connections|intervals)$/.test(location.hash)) setTimeout(() => document.getElementById("connections")?.scrollIntoView(), 300);
     setEntryState(readEntry());
     refreshCoros();
     setReady(true);
@@ -89,7 +92,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     corosHandleRedirect().then((r) => {
       if (!r) return;
-      setScreenState("connections");
+      setScreenState("paces");
+      setTimeout(() => document.getElementById("connections")?.scrollIntoView(), 300);
       if (r.ok) toast.success(r.message); else toast.error(r.message);
       refreshCoros();
     });
@@ -116,8 +120,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  const update = useCallback((patch: Partial<Settings>) => {
-    setSettings((s) => { const n = { ...s, ...patch }; saveLocal(n); return n; });
+  const update = useCallback((patch: Partial<Settings> | ((s: Settings) => Partial<Settings>)) => {
+    setSettings((s) => { const n = { ...s, ...(typeof patch === "function" ? patch(s) : patch) }; saveLocal(n); return n; });
   }, []);
   const updateHyrox = useCallback((patch: Partial<HyroxSettings>) => {
     setSettings((s) => { const n = { ...s, hyrox: { ...s.hyrox, ...patch } }; saveLocal(n); return n; });
@@ -131,11 +135,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const model = useMemo(() => buildModel(settings.pbDistance, settings.pbTime, settings.paceAdjust), [settings.pbDistance, settings.pbTime, settings.paceAdjust]);
-  const plan = useMemo(() => (model ? buildPlan(settings, model) : null), [settings, model]);
-  const hyrox = useMemo(() => buildHyrox(settings.hyrox, settings.startDate), [settings.hyrox, settings.startDate]);
+  const calendar = useMemo(() => buildCalendar(settings.startDate, settings.endDate, settings.races, settings.vacations),
+    [settings.startDate, settings.endDate, settings.races, settings.vacations]);
+  const plan = useMemo(() => (model ? buildPlan(settings, model, calendar) : null), [settings, model, calendar]);
+  const hyrox = useMemo(() => buildHyrox(settings.hyrox, calendar), [settings.hyrox, calendar]);
 
   const value: AppState = {
-    ready, settings, update, replaceSettings, model, plan, hyrox, updateHyrox, screen, setScreen,
+    ready, settings, update, replaceSettings, model, plan, hyrox, calendar, updateHyrox, screen, setScreen,
     entry: user ? "account" : entry,
     enterAsGuest: () => { writeEntry("guest"); setEntryState("guest"); },
     goHome: () => { writeEntry(null); setEntryState(null); },

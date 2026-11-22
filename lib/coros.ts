@@ -70,11 +70,11 @@ export function corosErrorMessage(err: CorosError, source: "direct" | "connector
     case "server_not_connected":
     case "server_not_found":
       return source === "direct"
-        ? "COROS isn't connected on this device. Connect it on the Connections tab."
+        ? "COROS isn't connected on this device. Connect it under Connections on Profile."
         : "The Claude NSM connector isn't connected. Add it in claude.ai Settings → Connectors.";
     case "needs_reauth":
       return source === "direct"
-        ? "Your COROS sign-in has expired. Reconnect COROS on the Connections tab."
+        ? "Your COROS sign-in has expired. Reconnect COROS under Connections on Profile."
         : "Your Claude NSM connector needs reconnecting in claude.ai Settings → Connectors.";
     case "session_unreadable":
       return "COROS needs a session ID this site isn't allowed to read, so direct sending can't work here.";

@@ -18,18 +18,18 @@ const PHASE_DOT: Record<HxWeek["phaseKey"], string> = {
 export function HyroxWeekCard({ wk }: { wk: HxWeek }) {
   const { settings } = useApp();
   const { sendIcu, busy } = useHxSend();
-  const [open, setOpen] = useState(wk.n <= 2);
-  const weak = settings.hyrox.weaknesses;
+  const [open, setOpen] = useState(wk.n <= 1);
+  const weak = wk.weak;
   const items = hxSendable(wk);
 
   return (
     <article className="overflow-hidden rounded-lg border bg-card">
       <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open}
         className="flex w-full flex-wrap items-center justify-between gap-x-4 gap-y-2 p-4 text-left hover:bg-accent/60 focus-visible:outline-2 focus-visible:outline-ring">
-        <span className="flex items-center gap-2">
-          <span className={cn("size-2 rounded-full", PHASE_DOT[wk.phaseKey])} aria-hidden />
-          <span className="font-black">Week {wk.n}</span>
-          <span className="font-extralight text-muted-foreground">{fmtShortDate(wk.weekStart)} · {wk.phase}{wk.light && wk.kind === "absorb" ? " · lighter" : ""}</span>
+        <span className="flex min-w-0 flex-wrap items-baseline gap-x-2">
+          <span className={cn("size-2 shrink-0 self-center rounded-full", PHASE_DOT[wk.phaseKey])} aria-hidden />
+          <span className="font-black whitespace-nowrap">Week {wk.n}</span>
+          <span className="font-extralight text-muted-foreground">{fmtShortDate(wk.weekStart)} · {wk.phase}{wk.light && wk.kind === "absorb" ? " · lighter" : ""}{wk.raceNames.length ? ` · ${wk.raceNames.join(", ")}` : ""}</span>
         </span>
       </button>
       {open && (

@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useApp } from "@/components/app-provider";
 import { MyPlans } from "@/components/plans/my-plans";
+import { BlockHeading, PeriodHeading } from "@/components/plans/block-heading";
 import { corosSent, dateKey, dayItems } from "@/lib/coros";
 import { dist, isoDate } from "@/lib/format";
 import { dayDate, MIN_EASY_KM } from "@/lib/plan";
@@ -22,11 +23,11 @@ import { useSend } from "./use-send";
 
 /** 12-Week Builder: plans, settings, template, the volume chart, then the weeks. */
 export function BuilderScreen() {
-  const { plan, settings, model } = useApp();
+  const { plan, settings, model, calendar } = useApp();
   const { sendIcu, sendCoros, busy, corosReady } = useSend();
   const [confirmAll, setConfirmAll] = useState(false);
   if (!plan || !model) {
-    return <Alert><AlertDescription>Enter a valid PB on Predicted Paces to build a plan.</AlertDescription></Alert>;
+    return <Alert><AlertDescription>Enter a valid PB on Profile to build a plan.</AlertDescription></Alert>;
   }
   const warns = templateWarnings(settings.template);
   if (plan.weeks.some((w) => w.tooLow)) warns.push(`Your volume is too low for this template, so some easy runs were raised to the ${dist(MIN_EASY_KM, settings.units)} minimum. Raise the volume or swap an easy day for rest.`);
@@ -39,7 +40,7 @@ export function BuilderScreen() {
     const blob = new Blob([rows.map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(",")).join("\r\n")], { type: "text/csv" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = "norwegian-singles-12-week-plan.csv";
+    a.download = "norwegian-singles-run-plan.csv";
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   }
@@ -47,9 +48,9 @@ export function BuilderScreen() {
   return (
     <div className="flex flex-col gap-8">
       <section className="flex flex-col gap-2">
-        <h1 className="font-display text-[2rem] leading-10 font-black md:text-display">12-week plan</h1>
+        <h1 className="font-display text-[2rem] leading-10 font-black md:text-display">Run Plan</h1>
         <p className="max-w-[65ch] text-muted-foreground">
-          {dist(plan.startKm, settings.units, 0)} to {dist(plan.peakKm, settings.units, 0)} a week, three sub-threshold sessions, one long run. Everything else is easy.
+          {plan.weeks.length} weeks in {calendar.periods.length} period{calendar.periods.length === 1 ? "" : "s"} of 12 weeks, each ramping to its own peak mileage, three sub-threshold sessions, one long run. Everything else is easy. Set dates, races and time off on Profile.
         </p>
       </section>
 
@@ -78,7 +79,17 @@ export function BuilderScreen() {
             )}
           </div>
         </div>
-        {plan.weeks.map((wk) => <WeekCard key={wk.n} wk={wk} weeks={plan.weeks} />)}
+        {calendar.periods.map((p) => (
+          <div key={p.i} className="flex flex-col gap-4">
+            <PeriodHeading p={p} />
+            {p.blocks.map((bi) => calendar.blocks[bi]).map((b) => (
+              <div key={b.i} className="flex flex-col gap-4">
+                <BlockHeading b={b} />
+                {b.weeks.map((wi) => <WeekCard key={wi} wk={plan.weeks[wi]} weeks={plan.weeks} />)}
+              </div>
+            ))}
+          </div>
+        ))}
       </section>
 
       <AlertDialog open={confirmAll} onOpenChange={setConfirmAll}>

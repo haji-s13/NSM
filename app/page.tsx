@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarRange, Dumbbell, Gauge, Link2 } from "lucide-react";
+import { CalendarRange, Dumbbell, LayoutDashboard, UserRound } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useApp, type Screen } from "@/components/app-provider";
 import { SiteHeader } from "@/components/site-header";
@@ -9,14 +9,13 @@ import { NewPasswordCard } from "@/components/auth/new-password-card";
 import { PacesScreen } from "@/components/paces/paces-screen";
 import { BuilderScreen } from "@/components/builder/builder-screen";
 import { HyroxScreen } from "@/components/hyrox/hyrox-screen";
-import { CorosCard } from "@/components/connections/coros-card";
-import { IntervalsCard } from "@/components/connections/intervals-card";
+import { DashboardScreen } from "@/components/dashboard/dashboard-screen";
 
-const NAV: { value: Screen; label: string; Icon: typeof Gauge }[] = [
-  { value: "paces", label: "Paces", Icon: Gauge },
+const NAV: { value: Screen; label: string; Icon: typeof UserRound }[] = [
+  { value: "dashboard", label: "Dashboard", Icon: LayoutDashboard },
   { value: "builder", label: "Run", Icon: CalendarRange },
   { value: "hyrox", label: "HYROX", Icon: Dumbbell },
-  { value: "connections", label: "Connect", Icon: Link2 },
+  { value: "paces", label: "Profile", Icon: UserRound },
 ];
 
 export default function Page() {
@@ -41,21 +40,10 @@ export default function Page() {
           </TabsList>
         </div>
         <main className="mx-auto w-full max-w-6xl px-[max(16px,env(safe-area-inset-left))] pt-8 pb-[calc(144px+env(safe-area-inset-bottom))] md:px-8 md:pb-16">
-          <TabsContent value="paces"><PacesScreen /></TabsContent>
+          <TabsContent value="dashboard"><DashboardScreen /></TabsContent>
           <TabsContent value="builder"><BuilderScreen /></TabsContent>
           <TabsContent value="hyrox"><HyroxScreen /></TabsContent>
-          <TabsContent value="connections">
-            <div className="flex flex-col gap-8">
-              <section className="flex flex-col gap-2">
-                <h1 className="font-display text-[2rem] leading-10 font-black md:text-display">Connections</h1>
-                <p className="max-w-[65ch] text-muted-foreground">Send workouts to your watch. Connect COROS directly, or use intervals.icu for COROS, Garmin and others.</p>
-              </section>
-              <div className="grid gap-8 lg:grid-cols-2">
-                <CorosCard />
-                <IntervalsCard />
-              </div>
-            </div>
-          </TabsContent>
+          <TabsContent value="paces"><PacesScreen /></TabsContent>
         </main>
       </Tabs>
     </>

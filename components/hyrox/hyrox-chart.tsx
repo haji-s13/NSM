@@ -7,6 +7,7 @@ import { useApp } from "@/components/app-provider";
 import { fmtDuration } from "@/lib/format";
 import { fmtVol, STATIONS, type HxWeek } from "@/lib/hyrox";
 import { cn } from "@/lib/utils";
+import { useChartWindow } from "@/components/plans/chart-window";
 
 const config = {
   base: { label: "Strength", color: "var(--phase-base)" },
@@ -22,7 +23,7 @@ function barPath(x: number, y: number, w: number, h: number) {
 
 interface Row { label: string; value: number; wk: HxWeek }
 
-/** Weekly station-session hours by phase, then 12-week volume per station with weak stations marked. */
+/** Weekly station-session hours by phase, then whole-plan volume per station with weak stations marked. */
 export function HyroxChart() {
   const { hyrox, settings } = useApp();
   const [narrow, setNarrow] = useState(false);
@@ -33,10 +34,16 @@ export function HyroxChart() {
     mq.addEventListener("change", on);
     return () => mq.removeEventListener("change", on);
   }, []);
-  const weak = settings.hyrox.weaknesses;
-  const rows: Row[] = hyrox.weeks.map((wk) => ({ label: `W${wk.n}`, value: Math.round((wk.totalMin / 60) * 10) / 10, wk }));
-  const showTrial = hyrox.weeks[11].phaseKey === "trial";
-  const multiples = STATIONS.map((s) => ({ s, v: hyrox.vol[s.key] || 0, x: (hyrox.vol[s.key] || 0) / s.race }));
+  const win = useChartWindow(hyrox.weeks);
+  const shown = hyrox.weeks.slice(win.start, win.end);
+  const weak = [...new Set(shown.flatMap((w) => w.weak))];
+  const rows: Row[] = shown.map((wk) => ({ label: `W${wk.n}`, value: Math.round((wk.totalMin / 60) * 10) / 10, wk }));
+  const showTrial = shown.some((w) => w.phaseKey === "trial");
+  const nW = shown.length;
+  const vol: Partial<Record<(typeof STATIONS)[number]["key"], number>> = {};
+  for (const w of shown) for (const k of Object.keys(w.vol) as (keyof typeof vol)[]) vol[k] = (vol[k] || 0) + (w.vol[k] || 0);
+  const totalMin = shown.reduce((t, w) => t + w.totalMin, 0);
+  const multiples = STATIONS.map((s) => ({ s, v: vol[s.key] || 0, x: (vol[s.key] || 0) / s.race }));
   const maxX = Math.max(...multiples.map((m) => m.x), 1);
 
   return (
@@ -50,6 +57,7 @@ export function HyroxChart() {
         <li className="flex items-center gap-2"><span className="hatch size-3 rounded-sm border border-muted-foreground" aria-hidden />Absorb or race week</li>
       </ul>
 
+      {win.controls}
       <ChartContainer config={config} className="aspect-auto h-56 w-full md:h-64">
         <BarChart data={rows} margin={{ top: 24, right: 8, left: -16, bottom: 0 }} accessibilityLayer>
           <defs>
@@ -60,7 +68,7 @@ export function HyroxChart() {
           <CartesianGrid vertical={false} stroke="var(--chart-grid)" />
           <YAxis tickLine={false} axisLine={false} width={40} className="num" unit="h" />
           <XAxis dataKey="label" tickLine={false} axisLine={false} interval={0}
-            tickFormatter={(v: string, i: number) => (narrow ? String(i + 1) : v)} className="text-meta" />
+            tickFormatter={(v: string, i: number) => (narrow ? String(rows[i]?.wk.n ?? i + 1) : v)} className="text-meta" />
           <ChartTooltip cursor={{ fill: "var(--accent)" }} content={({ active, payload }) => {
             const r = active && payload?.[0]?.payload as Row | undefined;
             if (!r) return null;
@@ -90,7 +98,7 @@ export function HyroxChart() {
 
       <div className="flex flex-col gap-2 border-t pt-4">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h3 className="text-meta uppercase text-muted-foreground">12-week station volume</h3>
+          <h3 className="text-meta uppercase text-muted-foreground">{nW}-Week Station Volume</h3>
           <p className="text-meta text-muted-foreground">× race distance</p>
         </div>
         <ul className="flex flex-col gap-2">
@@ -113,9 +121,9 @@ export function HyroxChart() {
 
       <dl className="grid grid-cols-2 gap-4 border-t pt-4 md:grid-cols-4">
         {[
-          ["12-week total", fmtDuration(hyrox.totalMin * 60)],
-          ["Avg time / week", fmtDuration((hyrox.totalMin * 60) / 12)],
-          ["Sessions", String(hyrox.weeks.reduce((t, w) => t + w.sessions, 0))],
+          [`${nW}-week total`, fmtDuration(totalMin * 60)],
+          ["Avg time / week", fmtDuration((totalMin * 60) / nW)],
+          ["Sessions", String(shown.reduce((t, w) => t + w.sessions, 0))],
           ["Weak stations", weak.length ? `${weak.length} · +${settings.hyrox.emphasis === "high" ? 50 : 25}%` : "None"],
         ].map(([k, v]) => (
           <div key={k} className="min-w-0">

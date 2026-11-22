@@ -1,8 +1,11 @@
 import { nextMonday, type Units } from "./format";
 import { defaultHyrox, normalizeHyrox, type HyroxSettings } from "./hyrox";
+import { addDays, defaultEnd, mondayOf, newId, type Race, type Vacation } from "./calendar";
+import { isoDate, parseDate } from "./format";
 
 export type SessionType = "rest" | "easy" | "short" | "medium" | "long" | "hills" | "longrun";
 export type RepFormat = "distance" | "time" | "mixed";
+/** Last week when no race falls in it ("race" is from older saves and means the same as "test"). */
 export type FinalWeek = "race" | "test" | "normal";
 
 /** Everything a plan is built from. Same shape and storage key as the original site,
@@ -13,8 +16,14 @@ export interface Settings {
   units: Units;
   paceAdjust: number;
   startDate: string;
-  startVolume: number;    // display unit per week
-  peakVolume: number;     // display unit per week
+  /** Last day of the build (any day; the plan runs to the end of that week). */
+  endDate: string;
+  races: Race[];
+  vacations: Vacation[];
+  startVolume: number;    // display unit per week (period 1)
+  peakVolume: number;     // display unit per week (period 1)
+  /** Per period: ramp up or hold, and the volumes. Period 1's numbers stay in startVolume/peakVolume. */
+  periodVolumes?: ({ ramp?: boolean; start?: number; peak?: number } | null)[];
   subtShare: number;      // % of weekly volume
   subtWarmupKm: number;   // always km
   subtCooldownKm: number; // always km
@@ -41,19 +50,23 @@ export const QUALITY: SessionType[] = ["short", "medium", "long", "hills"];
 export const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 
 export function defaultSettings(): Settings {
+  const start = nextMonday();
   return {
+    endDate: defaultEnd(start),
+    races: [{ id: newId(), date: isoDate(addDays(mondayOf(parseDate(start)!), 11 * 7 + 5)), name: "HYROX race", kind: "hyrox" }],
+    vacations: [],
     pbDistance: "5000",
     pbTime: "19:45",
     units: "km",
     paceAdjust: 0,
-    startDate: nextMonday(),
+    startDate: start,
     startVolume: 55,
     peakVolume: 75,
     subtShare: 25,
     subtWarmupKm: 2,
     subtCooldownKm: 1.5,
     repFormat: "distance",
-    finalWeek: "race",
+    finalWeek: "test",
     deloads: true,
     template: ["easy", "short", "easy", "medium", "easy", "long", "longrun"],
     hyrox: defaultHyrox(),
@@ -66,6 +79,17 @@ export function normalizeSettings(raw: unknown): Settings {
   const s = { ...d, ...(raw && typeof raw === "object" ? raw : {}) } as Settings;
   if (!Array.isArray(s.template) || s.template.length !== 7) s.template = d.template.slice();
   s.hyrox = normalizeHyrox(s.hyrox);
+  // Older saves were always 12 weeks with the race in week 12.
+  const raw0 = (raw && typeof raw === "object" ? raw : {}) as Partial<Settings> & { hyrox?: { finalWeek?: string; raceDay?: number } };
+  if (!raw0.endDate) s.endDate = defaultEnd(s.startDate);
+  if (!Array.isArray(raw0.races)) {
+    const wk12 = mondayOf(parseDate(s.startDate) || new Date());
+    s.races = raw0.hyrox?.finalWeek === "race" || raw0.finalWeek === "race" || !raw0.hyrox
+      ? [{ id: newId(), date: isoDate(addDays(wk12, 11 * 7 + (raw0.hyrox?.raceDay ?? 5))), name: raw0.hyrox ? "HYROX race" : "Race", kind: raw0.hyrox ? "hyrox" : "run" }]
+      : [];
+    if (s.finalWeek === "race") s.finalWeek = "test";
+  }
+  if (!Array.isArray(s.vacations)) s.vacations = [];
   return s;
 }
 
@@ -96,4 +120,20 @@ export function templateWarnings(t: SessionType[]): string[] {
   }
   if (t.filter((x) => x === "longrun").length > 1) warns.push("More than one long run per week.");
   return warns;
+}
+
+/** Weekly volume (display units) for a 12-week period. A ramping period builds from start to peak;
+ *  any other period holds one steady volume (start = peak). Period 1 ramps unless switched off;
+ *  later periods hold at the previous period's peak unless you switch ramping on. */
+export function periodVolume(s: Settings, p: number): { ramp: boolean; start: number; peak: number } {
+  const set = s.periodVolumes?.[p] || {};
+  if (p <= 0) {
+    const ramp = set.ramp ?? true;
+    return { ramp, start: s.startVolume, peak: ramp ? s.peakVolume : s.startVolume };
+  }
+  const prev = periodVolume(s, p - 1);
+  const ramp = set.ramp ?? false;
+  if (ramp) return { ramp, start: set.start ?? Math.round(prev.peak * 0.85), peak: set.peak ?? prev.peak };
+  const hold = set.start ?? prev.peak;
+  return { ramp, start: hold, peak: hold };
 }

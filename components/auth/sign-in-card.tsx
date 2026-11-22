@@ -81,7 +81,7 @@ export function SignInCard() {
       <Card className="gap-0 py-0">
         <CardContent className="flex flex-col gap-4 p-6">
           <div className="flex flex-col gap-2">
-            <h2 className="font-black">Reset your password</h2>
+            <h2 className="font-black">Reset Your Password</h2>
             <p className="text-muted-foreground">Enter your account email and we&apos;ll send you a link to set a new password.</p>
           </div>
           <form onSubmit={sendReset} noValidate className="flex flex-col gap-4">

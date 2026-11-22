@@ -38,16 +38,17 @@ export function DayCell({ wk, i }: { wk: Week; i: number }) {
   const d = wk.days[i];
   const u = settings.units;
   if (!model) return null;
+  const look: DayType = d.off === "hyrox" ? "race" : d.type;
   return (
-    <div className={cn("grid min-w-0 gap-2 p-4 md:grid-cols-[160px_minmax(0,1fr)_auto] md:items-start md:gap-6 md:px-6", CARD[d.type])}>
+    <div className={cn("grid min-w-0 gap-2 p-4 md:grid-cols-[160px_minmax(0,1fr)_auto] md:items-start md:gap-6 md:px-6", d.off === "vacation" ? "bg-muted" : CARD[look])}>
       <div className="flex items-center justify-between gap-2 md:flex-col md:items-start">
         <p className="text-meta uppercase text-muted-foreground">
           {DAYS[i]} <span className="font-extralight normal-case tracking-normal">{fmtShortDate(dayDate(wk, i))}</span>
         </p>
-        <span className={cn("rounded-full px-2 text-meta whitespace-nowrap uppercase", TINT[d.type])}>{d.title}</span>
+        <span className={cn("rounded-full px-2 text-meta uppercase", d.off === "vacation" ? "bg-card text-muted-foreground" : TINT[look])}>{d.title}</span>
       </div>
       {d.type === "rest" ? (
-        <p className="text-muted-foreground md:col-span-2">Rest or cross-train</p>
+        <p className="text-muted-foreground md:col-span-2">{d.off === "vacation" ? "Time off. Enjoy it." : d.off === "hyrox" ? `${d.note}: no run today. Race-day warm-up is on the HYROX tab.` : d.note || "Rest or cross-train"}</p>
       ) : (
         <>
           <div className="flex min-w-0 flex-col gap-0 tabular-nums">

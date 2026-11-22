@@ -1,10 +1,10 @@
 import { SignInCard } from "@/components/auth/sign-in-card";
 
 const FEATURES: [string, string][] = [
-  ["Paces", "15k, half and 30k bands from your VDOT"],
-  ["Run plan", "12 weeks: base, build, peak and taper, 5% a week at most"],
-  ["HYROX", "12 weeks of stations, with extra work on your weak ones"],
-  ["One calendar", "Both plans share a start date and save together"],
+  ["Profile", "Your PB, paces and season: dates, races and time off"],
+  ["Run plan", "Your dates, in 12-week periods of three 4-week blocks, 5% a week at most"],
+  ["HYROX", "Station blocks with extra work on your weak ones"],
+  ["One season", "Pick start and end, add races and time off; each race gets a taper"],
   ["Watch", "Send runs to COROS, everything to intervals.icu"],
   ["Profile", "Sign in to open your plans on any device"],
 ];
@@ -18,11 +18,11 @@ export function HomeScreen() {
           <div className="flex min-w-0 flex-col gap-6">
             <p className="text-meta uppercase text-signal">HYROX + Norwegian Singles Method</p>
             <h1 className="font-display text-[2.5rem] leading-[48px] font-black tracking-tight md:text-[4rem] md:leading-[72px]">
-              Run at threshold.<br />
-              <span className="font-extralight">Race the stations.</span>
+              Run At Threshold.<br />
+              <span className="font-extralight">Race The Stations.</span>
             </h1>
             <p className="max-w-[56ch] text-hero-muted">
-              Sub-threshold paces from your 5k or 10k PB, a 12-week Norwegian Singles run plan, and a 12-week HYROX station program that puts extra work where you lose time.
+              Sub-threshold paces from your 5k or 10k PB, a Norwegian Singles run plan and a HYROX station program built around your race dates, with extra work where you lose time.
             </p>
             <div className="grid gap-px overflow-hidden rounded-lg border border-hero-muted/25 bg-hero-muted/25 sm:grid-cols-2">
               <div className="bg-hero p-4">

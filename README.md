@@ -7,22 +7,20 @@ and shadcn/ui. Design rules are in [DESIGN.md](DESIGN.md).
 ## What it does
 
 - **Home**: sign in, create an account or continue as a guest.
-- **Paces**: VDOT from your PB (Jack Daniels' formula), race predictions, and training paces as ranges:
-  sub-T short (15k → half), medium (half → 25k), long (25k → 30k), 400s / hills, easy, and Daniels T for reference.
-- **Plan**:
-  - Weekly volume rises from the start volume toward the peak by at most 5% a week, with lighter weeks 4 and 8 and a taper or time trial in week 12.
-  - Sub-T rep counts are sized from each week's volume, with adjustable warm-up and cool-down.
-  - 6 × 20s strides on the first easy day of each week.
-  - Estimated time per workout and week.
-  - Weekly volume chart by phase.
-  - Copy (Strava text), CSV, and sending to intervals.icu or COROS per day, week or plan.
-  - **My plans**: save, open and delete named plans on your profile (Supabase).
-- **HYROX**: a 12-week station and strength program (no running; that's the run plan), built from a coach's year of programming.
-  - Phases: benchmark and strength, station build, race specific, sharpen, race week (or tests), with absorb weeks 4 and 8.
+- **Dashboard**: pick a day and see its run and HYROX session, or the next 3 or 7 days.
+- **Run**: Norwegian Singles run plan.
+  - Weeks in 4-week blocks, three blocks to a 12-week period.
+  - Mileage ramps (at most 5% a week) only in the periods you pick; other periods hold steady.
+  - Lighter last week of each block, a taper week before each race and a race week, time off respected.
+  - Sub-T rep counts sized from each week's volume, warm-up and cool-down, strides, estimated time.
+  - Weekly volume chart (12 weeks at a time), Copy (Strava text), CSV, intervals.icu and COROS.
+- **HYROX**: station and strength program (no running; that's the run plan), built from a coach's year of programming.
+  - Each period: strength, station build, then race specific, with absorb weeks, benchmarks and the coach's race-week taper.
   - Box squat, bench and deadlift on the maintenance cycle (3×15 → 4×10 → 5×5) or off-season waves; other formats rotate week to week.
-  - Weak stations get more volume, an extra phase-matched block and muscle-specific accessory work.
-  - Shares the start date and saved plans with the run plan. Copy, CSV and intervals.icu (as strength workouts).
-- **Connect**: COROS (direct OAuth sign-in to the COROS MCP server, or the Claude NSM connector on claude.ai) and intervals.icu (API key).
+  - Weak stations per period get more volume, a phase-matched extra block and muscle-specific accessory work.
+  - Workouts shown as lettered blocks with steps and cues. Copy, CSV and intervals.icu (as strength workouts).
+- **Profile**: PB and paces (VDOT), the shared **Season** (start and end, races, time off), and **Connections** (COROS and intervals.icu).
+- **My plans**: save, open and delete named plans on your profile (Supabase); both plans and the season save together.
 
 ## Develop
 
