@@ -11,7 +11,6 @@ import { DAYS, QUALITY } from "@/lib/settings";
 import { HyroxSettingsCard } from "./hyrox-settings";
 import { WeakStations } from "./weak-stations";
 import { HyroxTemplateCard } from "./hyrox-template";
-import { SessionLibrary } from "./session-library";
 import { HyroxChart } from "./hyrox-chart";
 import { HyroxWeekCard } from "./hyrox-week-card";
 import { hxSendable, useHxSend } from "./use-hx-send";
@@ -47,7 +46,6 @@ export function HyroxScreen() {
       <HyroxSettingsCard />
       <WeakStations />
       <HyroxTemplateCard />
-      <SessionLibrary />
 
       {warns.map((w) => <Alert key={w} variant="destructive"><AlertDescription>{w}</AlertDescription></Alert>)}
 

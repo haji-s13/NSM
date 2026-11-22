@@ -765,8 +765,3 @@ export function linkWarnings(hx: HxSlot[], run: string[], quality: string[], day
   return out;
 }
 
-/** A library session's text with this athlete's weights and run-leg choice filled in (for previews). */
-export function previewSessionText(h: HyroxSettings, text: string): string {
-  const c = new Ctx(h, { w: 0, benchRepeat: false, phase: "", phaseKey: "build", kind: "build", light: false, step: 0, vol: 1 });
-  return fillTemplate(c, text);
-}
