@@ -1,6 +1,6 @@
 import { KM_PER_MI, mid, nextMonday, parseDate, type Range } from "./format";
 import type { Model, Paces } from "./vdot";
-import { QUALITY, type Settings, type SessionType } from "./settings";
+import { periodVolume, QUALITY, type Settings, type SessionType } from "./settings";
 import { type Calendar, type CalBlock } from "./calendar";
 
 export const MAX_WEEKLY_INCREASE = 0.05;
@@ -71,6 +71,9 @@ export interface Week {
   totalSec: number;
   subtKm: number;
   tooLow: boolean;
+  /** The peak volume this week's period is building to. */
+  peakKm: number;
+  period: number;
   block: number;
   pos: number;
   vacation: boolean;
@@ -82,6 +85,8 @@ export interface Plan {
   startKm: number;
   peakKm: number;
   peakWeek: number | null; // 1-based week the peak is first reached
+  /** Per 12-week period: its start and peak, and when (if) the peak is reached. */
+  periods: { startKm: number; peakKm: number; peakWeek: number | null; maxKm: number }[];
   blocks: CalBlock[];
 }
 
@@ -102,8 +107,14 @@ function sessionSeconds(d: Session, p: Paces): number {
 
 export function buildPlan(s: Settings, m: Model, cal: Calendar): Plan {
   const p = m.paces;
-  const startKm = Math.max(toKm(s.startVolume, s) || 0, 10);
-  const peakKm = Math.max(toKm(s.peakVolume, s) || 0, startKm);
+  const vol = (p: number) => {
+    const v = periodVolume(s, p);
+    const a = Math.max(toKm(v.start, s) || 0, 10);
+    return { startKm: a, peakKm: Math.max(toKm(v.peak, s) || 0, a) };
+  };
+  const startKm = vol(0).startKm;
+  let peakKm = vol(0).peakKm;
+  const periods: Plan["periods"] = [];
   const wu = Math.max(0, Number(s.subtWarmupKm) || 0);
   const cd = Math.max(0, Number(s.subtCooldownKm) || 0);
   const raceKey = s.pbDistance === "10000" ? "10k" : "5k";
@@ -115,13 +126,21 @@ export function buildPlan(s: Settings, m: Model, cal: Calendar): Plan {
   let hold = false; // no increase in the first week back from a vacation
   for (const cw of cal.weeks) {
     const w = cw.i;
+    // Each 12-week period ramps from its own start volume toward its own peak.
+    const newPeriod = cw.pos === 0 && cw.blockInPeriod === 0;
+    if (newPeriod) {
+      const v = vol(cw.period);
+      peakKm = v.peakKm;
+      if (cw.period > 0) level = v.startKm;
+      periods[cw.period] = { startKm: v.startKm, peakKm: v.peakKm, peakWeek: null, maxKm: 0 };
+    }
     const vacation = cw.role === "vacation";
     const raceWeek = cw.role === "race";
     const preTaper = cw.role === "taper";
     const finalTest = cw.last && !raceWeek && s.finalWeek !== "normal";
     const taper = raceWeek || preTaper || finalTest;
     const deload = s.deloads && cw.pos === 3 && cw.role === "load" && !finalTest;
-    if (w > 0 && !taper && !deload && !vacation) {
+    if (w > 0 && !newPeriod && !taper && !deload && !vacation) {
       if (hold) hold = false;
       else level = Math.min(peakKm, level * (1 + MAX_WEEKLY_INCREASE));
     }
@@ -132,6 +151,9 @@ export function buildPlan(s: Settings, m: Model, cal: Calendar): Plan {
     if (vacation) { hold = true; level *= 0.95; }
     const atPeak = level >= peakKm - 0.05;
     if (atPeak && !deload && !taper && !vacation && peakWeek === null) peakWeek = w + 1;
+    const pp = periods[cw.period];
+    if (atPeak && !deload && !taper && !vacation && pp.peakWeek === null) pp.peakWeek = w + 1;
+    if (!deload && !taper && !vacation) pp.maxKm = Math.max(pp.maxKm, level);
     const fmt: "distance" | "time" = s.repFormat === "mixed" ? (w % 2 === 0 ? "distance" : "time") : s.repFormat;
 
     const tmpl: DayType[] = s.template.slice();
@@ -226,14 +248,14 @@ export function buildPlan(s: Settings, m: Model, cal: Calendar): Plan {
     const phase: Phase = vacation ? "Vacation" : raceWeek ? "Race week" : finalTest ? "Time trial" : preTaper ? "Taper" : `Block ${cw.blockInPeriod + 1}`;
     weeks.push({
       n: w + 1, phase, phaseKey: raceWeek || finalTest ? "trial" : cw.phase, deload, taper, atPeak, fmt, days, weekStart, targetKm,
-      block: cw.block, pos: cw.pos, vacation, raceNames: cw.races.map((r) => r.race.name || "Race"),
+      peakKm, period: cw.period, block: cw.block, pos: cw.pos, vacation, raceNames: cw.races.map((r) => r.race.name || "Race"),
       totalKm: days.reduce((a, d) => a + d.km, 0),
       totalSec: days.reduce((a, d) => a + d.sec, 0),
       subtKm: days.reduce((a, d) => a + (d.repKm || 0), 0),
       tooLow,
     });
   }
-  return { weeks, startKm, peakKm, peakWeek, blocks: cal.blocks };
+  return { weeks, startKm, peakKm: Math.max(...periods.map((p) => p.peakKm)), peakWeek, periods, blocks: cal.blocks };
 }
 
 export const dayDate = (wk: Week, i: number) => {

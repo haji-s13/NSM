@@ -43,7 +43,7 @@ export function VolumeChart() {
     label: `W${wk.n}`, value: Math.round(toU(wk.totalKm) * 10) / 10,
     hours: (wk.totalSec / 3600).toFixed(1), wk,
   }));
-  const peak = Math.round(toU(plan.peakKm));
+  const peak = Math.round(toU(Math.max(...shown.map((w) => w.peakKm))));
   const total = shown.reduce((t, w) => t + w.totalKm, 0);
   const subt = shown.reduce((t, w) => t + w.subtKm, 0);
   const time = shown.reduce((t, w) => t + w.totalSec, 0);
@@ -65,7 +65,7 @@ export function VolumeChart() {
       {win.controls}
       {narrow && <p className="-mb-2 text-meta uppercase text-muted-foreground">Week · hours under each bar</p>}
       <ChartContainer config={config} className="aspect-auto h-64 w-full md:h-72">
-        <BarChart data={rows} margin={{ top: 24, right: 8, left: -16, bottom: 0 }} accessibilityLayer>
+        <BarChart data={rows} margin={{ top: 24, right: 8, left: -8, bottom: 0 }} accessibilityLayer>
           <defs>
             <pattern id="hatch-lighter" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
               <line x1="0" y1="0" x2="0" y2="6" stroke="var(--card)" strokeWidth="2.5" />

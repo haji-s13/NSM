@@ -20,8 +20,10 @@ export interface Settings {
   endDate: string;
   races: Race[];
   vacations: Vacation[];
-  startVolume: number;    // display unit per week
-  peakVolume: number;     // display unit per week
+  startVolume: number;    // display unit per week (period 1)
+  peakVolume: number;     // display unit per week (period 1)
+  /** Start and peak volume for periods 2, 3, … (index 0 is unused: period 1 uses startVolume/peakVolume). */
+  periodVolumes?: ({ start: number; peak: number } | null)[];
   subtShare: number;      // % of weekly volume
   subtWarmupKm: number;   // always km
   subtCooldownKm: number; // always km
@@ -118,4 +120,14 @@ export function templateWarnings(t: SessionType[]): string[] {
   }
   if (t.filter((x) => x === "longrun").length > 1) warns.push("More than one long run per week.");
   return warns;
+}
+
+/** Start and peak weekly volume (display units) for a 12-week period. Later periods default to
+ *  starting about 15% under the previous peak and building back to it. */
+export function periodVolume(s: Settings, p: number): { start: number; peak: number } {
+  if (p <= 0) return { start: s.startVolume, peak: s.peakVolume };
+  const set = s.periodVolumes?.[p];
+  if (set) return set;
+  const prev = periodVolume(s, p - 1);
+  return { start: Math.round(prev.peak * 0.85), peak: prev.peak };
 }

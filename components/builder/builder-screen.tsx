@@ -50,7 +50,7 @@ export function BuilderScreen() {
       <section className="flex flex-col gap-2">
         <h1 className="font-display text-[2rem] leading-10 font-black md:text-display">Run plan</h1>
         <p className="max-w-[65ch] text-muted-foreground">
-          {plan.weeks.length} weeks in {calendar.periods.length} period{calendar.periods.length === 1 ? "" : "s"} of 12 weeks, {dist(plan.startKm, settings.units, 0)} to {dist(plan.peakKm, settings.units, 0)} a week, three sub-threshold sessions, one long run. Everything else is easy. Set dates, races and time off on Profile.
+          {plan.weeks.length} weeks in {calendar.periods.length} period{calendar.periods.length === 1 ? "" : "s"} of 12 weeks, each ramping to its own peak mileage, three sub-threshold sessions, one long run. Everything else is easy. Set dates, races and time off on Profile.
         </p>
       </section>
 

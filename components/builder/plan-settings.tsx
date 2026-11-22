@@ -8,7 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useApp } from "@/components/app-provider";
-import { KM_PER_MI, dist, unitDist } from "@/lib/format";
+import { KM_PER_MI, dist, fmtShortDate, unitDist } from "@/lib/format";
+import { periodVolume } from "@/lib/settings";
 
 const OPEN_KEY = "nsm-settings-collapsed";
 
@@ -25,7 +26,7 @@ function Field({ id, label, hint, children }: { id: string; label: string; hint?
 
 /** Collapsible settings with a one-line summary when closed. */
 export function PlanSettings() {
-  const { settings: s, update, plan } = useApp();
+  const { settings: s, update, plan, calendar } = useApp();
   const [open, setOpen] = useState(true);
   useEffect(() => { try { setOpen(localStorage.getItem(OPEN_KEY) !== "1"); } catch { /* ignore */ } }, []);
   const toggle = (o: boolean) => { setOpen(o); try { localStorage.setItem(OPEN_KEY, o ? "0" : "1"); } catch { /* ignore */ } };
@@ -43,18 +44,49 @@ export function PlanSettings() {
         </span>
         {!open && (
           <span className="num font-extralight text-muted-foreground">
-            {s.startVolume} → {s.peakVolume} {unitDist(u)} · {s.subtShare}% sub-T · WU {dist(s.subtWarmupKm, u)} · CD {dist(s.subtCooldownKm, u)}
+            {calendar.periods.map((p) => { const v = periodVolume(s, p.i); return `${v.start}→${v.peak}`; }).join(" · ")} {unitDist(u)} · {s.subtShare}% sub-T · WU {dist(s.subtWarmupKm, u)} · CD {dist(s.subtCooldownKm, u)}
           </span>
         )}
       </CollapsibleTrigger>
       <CollapsibleContent className="flex flex-col gap-6 border-t p-4 md:p-6">
+        <section className="flex flex-col gap-2">
+          <h3 className="font-black">Mileage by period</h3>
+          <p className="max-w-[65ch] font-extralight text-muted-foreground">
+            Each 12-week period ramps from its start volume to its peak, at most 5% a week. Set them per period.
+          </p>
+          <ul className="flex flex-col gap-2">
+            {calendar.periods.map((p) => {
+              const v = periodVolume(s, p.i);
+              const info = plan?.periods[p.i];
+              const setP = (patch: Partial<{ start: number; peak: number }>) => {
+                if (p.i === 0) return update({ ...(patch.start !== undefined && { startVolume: patch.start }), ...(patch.peak !== undefined && { peakVolume: patch.peak }) });
+                const pv = (s.periodVolumes || []).slice();
+                pv[p.i] = { ...v, ...patch };
+                update({ periodVolumes: pv });
+              };
+              return (
+                <li key={p.i} className="grid grid-cols-2 gap-x-4 gap-y-2 rounded-lg border p-2 md:grid-cols-[200px_140px_140px_minmax(0,1fr)] md:items-end md:p-3">
+                  <p className="col-span-2 md:col-span-1 md:self-center">
+                    <span className="font-black">Period {p.i + 1}</span>{" "}
+                    <span className="num font-extralight text-muted-foreground">{fmtShortDate(p.start)} – {fmtShortDate(p.end)}</span>
+                  </p>
+                  <Field id={`pv-start-${p.i}`} label="Start" hint={`${unitDist(u)}/wk`}>
+                    <Input id={`pv-start-${p.i}`} className="num" type="number" inputMode="numeric" min={10} max={250} value={v.start} onChange={(e) => setP({ start: num(e.target.value) })} />
+                  </Field>
+                  <Field id={`pv-peak-${p.i}`} label="Peak" hint={`${unitDist(u)}/wk`}>
+                    <Input id={`pv-peak-${p.i}`} className="num" type="number" inputMode="numeric" min={15} max={250} value={v.peak} onChange={(e) => setP({ peak: num(e.target.value) })} />
+                  </Field>
+                  {info && (
+                    <p className="col-span-2 font-extralight text-muted-foreground md:col-span-1 md:self-center">
+                      {info.peakWeek ? `Peak in week ${info.peakWeek}` : info.maxKm ? `Reaches ${dist(info.maxKm, u, 0)}, short of the peak at 5% a week` : "Only taper, race or lighter weeks"}
+                    </p>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
         <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-          <Field id="start-volume" label="Start volume" hint={`${unitDist(u)}/wk`}>
-            <Input id="start-volume" className="num" type="number" inputMode="numeric" min={10} max={250} value={s.startVolume} onChange={(e) => update({ startVolume: num(e.target.value) })} />
-          </Field>
-          <Field id="peak-volume" label="Peak volume" hint={`${unitDist(u)}/wk`}>
-            <Input id="peak-volume" className="num" type="number" inputMode="numeric" min={15} max={250} value={s.peakVolume} onChange={(e) => update({ peakVolume: num(e.target.value) })} />
-          </Field>
           <Field id="subt-share" label="Sub-T share" hint="% of volume">
             <Input id="subt-share" className="num" type="number" inputMode="numeric" min={10} max={35} value={s.subtShare} onChange={(e) => update({ subtShare: num(e.target.value) })} />
           </Field>
@@ -90,7 +122,7 @@ export function PlanSettings() {
         </label>
         {plan && (
           <p className="max-w-[65ch] font-extralight text-muted-foreground">
-            Starts at {dist(plan.startKm, u, 0)} and {plan.peakWeek ? `reaches your ${dist(plan.peakKm, u, 0)} peak in week ${plan.peakWeek}` : `reaches ${dist(Math.max(...plan.weeks.filter((w) => !w.deload && !w.taper && !w.vacation).map((w) => w.targetKm)), u, 0)} at most, short of your ${dist(plan.peakKm, u, 0)} peak at 5% a week`}. Volume rises at most 5% a week over the last full week; lighter weeks drop to 80%, the week before a race to 85% and race weeks to 65%. The first week back from a vacation holds instead of rising.
+            Volume rises at most 5% a week over the last full week; lighter weeks drop to 80%, the week before a race to 85% and race weeks to 65%. The first week back from a vacation holds instead of rising.
           </p>
         )}
       </CollapsibleContent>
