@@ -9,6 +9,8 @@ import { hxDayDate, hxDayText, type HxDayType, type HxWeek } from "@/lib/hyrox";
 import { DAYS } from "@/lib/settings";
 import { copyText } from "@/lib/workout-text";
 import { cn } from "@/lib/utils";
+import { prettyBlock } from "@/lib/hx-format";
+import type { HxBlock } from "@/lib/hyrox";
 
 /** Same tints as the run plan: easy green for aerobic, blue for strength, orange for quality, red for tests and races. */
 export const HX_CARD: Record<HxDayType, string> = {
@@ -53,16 +55,12 @@ export function HyroxDayRow({ wk, i, onIcu, busy, hideRun = false }: { wk: HxWee
       ) : (
         <>
           <div className="flex min-w-0 flex-col gap-1">
-            {d.blocks.map((b, k) => (
-              <p key={k} className={cn("break-words", b.label === "Warm-up" ? "font-extralight text-muted-foreground" : b.weak || b.acc ? "" : "font-black")}>
-                {b.label === "Warm-up" ? `Warm-up ${b.text}` : (
-                  <>
-                    <span className={cn("mr-2 text-meta uppercase", b.weak ? "text-signal" : "text-muted-foreground")}>{b.weak ? "Weak · " + b.label.split("· ")[1] : b.acc ? "Accessory · " + b.label.split("· ")[1] : b.label}</span>
-                    {b.text}
-                  </>
-                )}
-              </p>
+            {d.blocks.filter((b) => b.label === "Warm-up").map((b, k) => (
+              <p key={k} className="font-extralight text-muted-foreground">Warm-up · {b.text}</p>
             ))}
+            <ol className="flex flex-col divide-y divide-border overflow-hidden rounded-md border bg-card">
+              {d.blocks.filter((b) => b.label !== "Warm-up").map((b, k) => <BlockView key={k} b={b} />)}
+            </ol>
             <p className="num text-muted-foreground">{d.type === "race" ? "Race day" : `~${Math.round(d.min)} min`}</p>
             {runLine && <p className="text-meta uppercase text-muted-foreground">Run plan <span className="font-extralight normal-case tracking-normal text-foreground">{runLine}</span></p>}
           </div>
@@ -75,5 +73,43 @@ export function HyroxDayRow({ wk, i, onIcu, busy, hideRun = false }: { wk: HxWee
         </>
       )}
     </div>
+  );
+}
+
+/** Keep "30 s", "20 m", "× 10" together when lines wrap. */
+const keepUnits = (s: string) => s.replace(/(\d)\s(?=(s|m|kg|lb|min|km|cal|reps|%)\b)/g, "$1\u00a0").replace(/×\s/g, "×\u00a0");
+
+/** One block: letter badge (A, B, C) or a tag (Weak, Accessory, Main), the work as a heading
+ *  and a list of steps, then the coach's cues in small type. */
+function BlockView({ b }: { b: HxBlock }) {
+  const p = prettyBlock(keepUnits(b.text));
+  const letter = /^[A-Z]$/.test(b.label);
+  const station = b.label.split("· ")[1];
+  const tag = b.weak ? `Weak station · ${station}` : b.acc ? `Accessory · ${station}` : letter || b.label === "Main" ? null : b.label;
+  return (
+    <li className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 p-3">
+      <span className={cn("flex size-7 items-center justify-center rounded-md text-meta font-black",
+        b.weak ? "bg-signal text-signal-foreground" : b.acc ? "bg-muted text-muted-foreground" : "bg-primary text-primary-foreground")} aria-hidden>
+        {letter ? b.label : b.weak ? "W" : b.acc ? "+" : b.label === "Main" ? "•" : b.label[0]}
+      </span>
+      <div className="flex min-w-0 flex-col gap-1">
+        {tag && <p className={cn("text-meta uppercase", b.weak ? "text-signal" : "text-muted-foreground")}>{tag}</p>}
+        {p.lines.map((l, i) => (
+          <div key={i} className="flex flex-col gap-0.5">
+            {l.head && <p className="font-black break-words">{l.head}</p>}
+            {l.items.length > 0 && (
+              <ul className="flex flex-col gap-0.5">
+                {l.items.map((it, j) => (
+                  <li key={j} className="grid grid-cols-[12px_minmax(0,1fr)] items-baseline gap-x-1 break-words">
+                    <span className={cn("size-1.5 translate-y-[-2px] rounded-full", b.weak ? "bg-signal" : "bg-muted-foreground")} aria-hidden />{it}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        ))}
+        {p.notes.length > 0 && <p className="font-extralight text-muted-foreground">{p.notes.join(". ")}.</p>}
+      </div>
+    </li>
   );
 }

@@ -1,4 +1,5 @@
 import { isoDate } from "./format";
+import { prettyText } from "./hx-format";
 import { type Calendar, type CalBlock, type CalWeek, type Race } from "./calendar";
 
 /* HYROX station program (no running: that lives in the run plan).
@@ -220,7 +221,7 @@ function weakBlock(c: Ctx, st: Station): HxBlock | null {
       if (intent === "capacity") {
         n = Math.min(5, c.n(3 + Math.min(step, 1), st)); c.add(st, 60 * n);
         const loads = [`${c.w(d.lunges - 10)}`, `${c.w(d.lunges - 5)}`, c.w(d.lunges), c.w(d.lunges + 5), c.w(d.lunges + 10)];
-        return { label, weak: st, min: n * 4, text: `Lunge Specificity, ${n} rounds: 40 walking lunges ramping ${loads.slice(0, Math.min(n, 5)).join(", ")} + 20 fast bodyweight lunges, rest 1:1` };
+        return { label, weak: st, min: n * 4, text: `Lunge Specificity, ${n} rounds: 40 walking lunges ramping ${loads.slice(0, Math.min(n, 5)).join(" → ")} + 20 fast bodyweight lunges, rest 1:1` };
       }
       n = c.n(3, st); c.add(st, 30 * n); c.add("wb", 30 * n);
       return { label, weak: st, min: n * 5, text: `Lunges into wall balls: ${n} × (30 m lunges @ ${c.w(d.lunges)} + 30 WB @ ${c.w(d.wb)}), 2 min rest. Transition immediately.` };
@@ -447,7 +448,7 @@ function upper(c: Ctx): HxBlock[] {
     case 1: c.add("pull", 12.5 * pull); c.add("farmers", 30 * carry);
       C = { label: "C", min: pull * 2 + carry * 1.5, text: `Sled pull E2MOM ${pull} × 12.5 m from ${c.w(d.pull)}, adding ${c.inc(5)} a round; heavy farmers ${carry} × 30 m @ ${c.w(d.farmers + 8)}` }; break;
     default: { const lp = Math.max(2, pull - 1); c.add("pull", 25 * lp); c.add("farmers", 100 * Math.max(2, carry - 1));
-      C = { label: "C", min: lp * 3 + 4, text: `Sled pull ${lp} × 25 m @ ${c.w(d.pull)}: big strong pulls, arms and hip drive only; farmers ${Math.max(2, carry - 1)} × 100 m unbroken @ ${c.w(d.farmers)}` }; }
+      C = { label: "C", min: lp * 3 + 4, text: `Sled pull ${lp} × 25 m @ ${c.w(d.pull)} (big strong pulls, arms and hip drive only); farmers ${Math.max(2, carry - 1)} × 100 m unbroken @ ${c.w(d.farmers)}` }; }
   }
   return [A, B, C];
 }
@@ -671,7 +672,7 @@ export const fmtVol = (st: Station, v: number) => `${Math.round(v).toLocaleStrin
 /** Plain text for one day (Copy button, intervals.icu description). */
 export function hxDayText(wk: HxWeek, d: HxDay): string {
   const lines = [`${d.title} – HYROX week ${wk.n} (${wk.phase})`];
-  for (const b of d.blocks) lines.push(`${b.label}: ${b.text}`);
+  for (const b of d.blocks) lines.push(b.label === "Warm-up" ? `Warm-up: ${b.text}` : prettyText(b.label, b.text));
   if (d.min && d.type !== "race") lines.push(`Est. time: ~${Math.round(d.min)} min`);
   return lines.join("\n");
 }
