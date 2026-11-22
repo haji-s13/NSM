@@ -22,8 +22,8 @@ export interface Settings {
   vacations: Vacation[];
   startVolume: number;    // display unit per week (period 1)
   peakVolume: number;     // display unit per week (period 1)
-  /** Start and peak volume for periods 2, 3, … (index 0 is unused: period 1 uses startVolume/peakVolume). */
-  periodVolumes?: ({ start: number; peak: number } | null)[];
+  /** Per period: ramp up or hold, and the volumes. Period 1's numbers stay in startVolume/peakVolume. */
+  periodVolumes?: ({ ramp?: boolean; start?: number; peak?: number } | null)[];
   subtShare: number;      // % of weekly volume
   subtWarmupKm: number;   // always km
   subtCooldownKm: number; // always km
@@ -122,12 +122,18 @@ export function templateWarnings(t: SessionType[]): string[] {
   return warns;
 }
 
-/** Start and peak weekly volume (display units) for a 12-week period. Later periods default to
- *  starting about 15% under the previous peak and building back to it. */
-export function periodVolume(s: Settings, p: number): { start: number; peak: number } {
-  if (p <= 0) return { start: s.startVolume, peak: s.peakVolume };
-  const set = s.periodVolumes?.[p];
-  if (set) return set;
+/** Weekly volume (display units) for a 12-week period. A ramping period builds from start to peak;
+ *  any other period holds one steady volume (start = peak). Period 1 ramps unless switched off;
+ *  later periods hold at the previous period's peak unless you switch ramping on. */
+export function periodVolume(s: Settings, p: number): { ramp: boolean; start: number; peak: number } {
+  const set = s.periodVolumes?.[p] || {};
+  if (p <= 0) {
+    const ramp = set.ramp ?? true;
+    return { ramp, start: s.startVolume, peak: ramp ? s.peakVolume : s.startVolume };
+  }
   const prev = periodVolume(s, p - 1);
-  return { start: Math.round(prev.peak * 0.85), peak: prev.peak };
+  const ramp = set.ramp ?? false;
+  if (ramp) return { ramp, start: set.start ?? Math.round(prev.peak * 0.85), peak: set.peak ?? prev.peak };
+  const hold = set.start ?? prev.peak;
+  return { ramp, start: hold, peak: hold };
 }

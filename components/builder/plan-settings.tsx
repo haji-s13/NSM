@@ -44,7 +44,7 @@ export function PlanSettings() {
         </span>
         {!open && (
           <span className="num font-extralight text-muted-foreground">
-            {calendar.periods.map((p) => { const v = periodVolume(s, p.i); return `${v.start}→${v.peak}`; }).join(" · ")} {unitDist(u)} · {s.subtShare}% sub-T · WU {dist(s.subtWarmupKm, u)} · CD {dist(s.subtCooldownKm, u)}
+            {calendar.periods.map((p) => { const v = periodVolume(s, p.i); return v.ramp ? `${v.start}→${v.peak}` : `${v.start}`; }).join(" · ")} {unitDist(u)} · {s.subtShare}% sub-T · WU {dist(s.subtWarmupKm, u)} · CD {dist(s.subtCooldownKm, u)}
           </span>
         )}
       </CollapsibleTrigger>
@@ -52,33 +52,54 @@ export function PlanSettings() {
         <section className="flex flex-col gap-2">
           <h3 className="font-black">Mileage by period</h3>
           <p className="max-w-[65ch] font-extralight text-muted-foreground">
-            Each 12-week period ramps from its start volume to its peak, at most 5% a week. Set them per period.
+            Switch on Ramp up for the periods you want to build mileage in: they go from start to peak at most 5% a week. Other periods hold a steady volume.
           </p>
           <ul className="flex flex-col gap-2">
             {calendar.periods.map((p) => {
               const v = periodVolume(s, p.i);
               const info = plan?.periods[p.i];
-              const setP = (patch: Partial<{ start: number; peak: number }>) => {
-                if (p.i === 0) return update({ ...(patch.start !== undefined && { startVolume: patch.start }), ...(patch.peak !== undefined && { peakVolume: patch.peak }) });
-                const pv = (s.periodVolumes || []).slice();
-                pv[p.i] = { ...v, ...patch };
-                update({ periodVolumes: pv });
+              const setP = (patch: { ramp?: boolean; start?: number; peak?: number }) => {
+                // Built from the latest settings, so quick edits can't overwrite each other.
+                update((cur) => {
+                  const pv = (cur.periodVolumes || []).slice();
+                  if (p.i === 0) {
+                    if (patch.ramp !== undefined) pv[0] = { ...(pv[0] || {}), ramp: patch.ramp };
+                    return { periodVolumes: pv, ...(patch.start !== undefined && { startVolume: patch.start }), ...(patch.peak !== undefined && { peakVolume: patch.peak }) };
+                  }
+                  const now = periodVolume(cur, p.i);
+                  pv[p.i] = { ...(pv[p.i] || {}), ...(patch.ramp !== undefined && { ramp: patch.ramp, start: now.start, peak: now.peak }), ...(patch.start !== undefined && { start: patch.start }), ...(patch.peak !== undefined && { peak: patch.peak }) };
+                  return { periodVolumes: pv };
+                });
               };
               return (
                 <li key={p.i} className="grid grid-cols-2 gap-x-4 gap-y-2 rounded-lg border p-2 md:grid-cols-[200px_140px_140px_minmax(0,1fr)] md:items-end md:p-3">
-                  <p className="col-span-2 md:col-span-1 md:self-center">
-                    <span className="font-black">Period {p.i + 1}</span>{" "}
-                    <span className="num font-extralight text-muted-foreground">{fmtShortDate(p.start)} – {fmtShortDate(p.end)}</span>
-                  </p>
-                  <Field id={`pv-start-${p.i}`} label="Start" hint={`${unitDist(u)}/wk`}>
-                    <Input id={`pv-start-${p.i}`} className="num" type="number" inputMode="numeric" min={10} max={250} value={v.start} onChange={(e) => setP({ start: num(e.target.value) })} />
-                  </Field>
-                  <Field id={`pv-peak-${p.i}`} label="Peak" hint={`${unitDist(u)}/wk`}>
-                    <Input id={`pv-peak-${p.i}`} className="num" type="number" inputMode="numeric" min={15} max={250} value={v.peak} onChange={(e) => setP({ peak: num(e.target.value) })} />
-                  </Field>
+                  <div className="col-span-2 flex flex-wrap items-center justify-between gap-2 md:col-span-4">
+                    <p>
+                      <span className="font-black">Period {p.i + 1}</span>{" "}
+                      <span className="num font-extralight text-muted-foreground">{fmtShortDate(p.start)} – {fmtShortDate(p.end)}</span>
+                    </p>
+                    <label htmlFor={`pv-ramp-${p.i}`} className="flex min-h-12 items-center gap-2 md:min-h-10">
+                      <Switch id={`pv-ramp-${p.i}`} checked={v.ramp} onCheckedChange={(on) => setP({ ramp: on })} />
+                      <span>Ramp up</span>
+                    </label>
+                  </div>
+                  {v.ramp ? (
+                    <>
+                      <Field id={`pv-start-${p.i}`} label="Start" hint={`${unitDist(u)}/wk`}>
+                        <Input id={`pv-start-${p.i}`} className="num" type="number" inputMode="numeric" min={10} max={250} value={v.start} onChange={(e) => setP({ start: num(e.target.value) })} />
+                      </Field>
+                      <Field id={`pv-peak-${p.i}`} label="Peak" hint={`${unitDist(u)}/wk`}>
+                        <Input id={`pv-peak-${p.i}`} className="num" type="number" inputMode="numeric" min={15} max={250} value={v.peak} onChange={(e) => setP({ peak: num(e.target.value) })} />
+                      </Field>
+                    </>
+                  ) : (
+                    <Field id={`pv-hold-${p.i}`} label="Hold at" hint={`${unitDist(u)}/wk`}>
+                      <Input id={`pv-hold-${p.i}`} className="num" type="number" inputMode="numeric" min={10} max={250} value={v.start} onChange={(e) => setP({ start: num(e.target.value) })} />
+                    </Field>
+                  )}
                   {info && (
                     <p className="col-span-2 font-extralight text-muted-foreground md:col-span-1 md:self-center">
-                      {info.peakWeek ? `Peak in week ${info.peakWeek}` : info.maxKm ? `Reaches ${dist(info.maxKm, u, 0)}, short of the peak at 5% a week` : "Only taper, race or lighter weeks"}
+                      {!v.ramp ? "Steady volume, lighter every 4th week" : info.peakWeek ? `Peak in week ${info.peakWeek}` : info.maxKm ? `Reaches ${dist(info.maxKm, u, 0)}, short of the peak at 5% a week` : "Only taper, race or lighter weeks"}
                     </p>
                   )}
                 </li>

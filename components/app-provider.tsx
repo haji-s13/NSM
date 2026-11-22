@@ -17,7 +17,7 @@ type Entry = "guest" | "account" | null;
 interface AppState {
   ready: boolean;
   settings: Settings;
-  update: (patch: Partial<Settings>) => void;
+  update: (patch: Partial<Settings> | ((s: Settings) => Partial<Settings>)) => void;
   replaceSettings: (s: Settings) => void;
   model: Model | null;
   plan: Plan | null;
@@ -120,8 +120,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  const update = useCallback((patch: Partial<Settings>) => {
-    setSettings((s) => { const n = { ...s, ...patch }; saveLocal(n); return n; });
+  const update = useCallback((patch: Partial<Settings> | ((s: Settings) => Partial<Settings>)) => {
+    setSettings((s) => { const n = { ...s, ...(typeof patch === "function" ? patch(s) : patch) }; saveLocal(n); return n; });
   }, []);
   const updateHyrox = useCallback((patch: Partial<HyroxSettings>) => {
     setSettings((s) => { const n = { ...s, hyrox: { ...s.hyrox, ...patch } }; saveLocal(n); return n; });
