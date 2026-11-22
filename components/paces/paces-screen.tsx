@@ -23,6 +23,7 @@ export function PacesScreen() {
       </section>
 
       <Card className="gap-4 py-6">
+        <CardHeader className="px-4 md:px-6"><CardTitle className="font-black">Paces</CardTitle></CardHeader>
         <CardContent className="px-4 md:px-6"><PbForm /></CardContent>
       </Card>
 
@@ -36,7 +37,7 @@ export function PacesScreen() {
           </p>
         </div>
         <div className="min-w-0 pb-2">
-          <h2 className="font-display text-[2rem] leading-10 font-black">Predicted paces</h2>
+          <h2 className="font-display text-[2rem] leading-10 font-black">Predicted Paces</h2>
           <p className="max-w-[65ch] text-muted-foreground">
             From your {settings.pbDistance === "10000" ? "10k" : "5k"} PB, using Jack Daniels&apos; VDOT formula. Every pace is a range: the fast end is the most you should push.
           </p>
@@ -45,11 +46,11 @@ export function PacesScreen() {
 
       <div className="grid gap-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
         <Card className="gap-2 py-6">
-          <CardHeader className="px-4 md:px-6"><CardTitle className="text-meta uppercase">Race predictions</CardTitle></CardHeader>
+          <CardHeader className="px-4 md:px-6"><CardTitle className="text-meta uppercase">Race Predictions</CardTitle></CardHeader>
           <CardContent className="px-4 md:px-6"><RaceTable /></CardContent>
         </Card>
         <Card className="gap-2 py-6">
-          <CardHeader className="px-4 md:px-6"><CardTitle className="text-meta uppercase">Training paces</CardTitle></CardHeader>
+          <CardHeader className="px-4 md:px-6"><CardTitle className="text-meta uppercase">Training Paces</CardTitle></CardHeader>
           <CardContent className="px-4 md:px-6">
             <PaceTable />
             <p className="mt-4 max-w-[65ch] font-extralight text-muted-foreground">

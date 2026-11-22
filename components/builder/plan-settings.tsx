@@ -42,7 +42,7 @@ export function PlanSettings() {
     <Collapsible open={open} onOpenChange={toggle} className="rounded-lg border bg-card">
       <CollapsibleTrigger className="flex w-full flex-wrap items-baseline justify-between gap-x-4 gap-y-2 p-4 text-left hover:bg-accent/60 focus-visible:outline-2 focus-visible:outline-ring md:px-6">
         <span className="flex items-center gap-2 font-black">
-          <ChevronDown className={`size-4 transition-transform ${open ? "" : "-rotate-90"}`} aria-hidden /> Plan settings
+          <ChevronDown className={`size-4 transition-transform ${open ? "" : "-rotate-90"}`} aria-hidden /> Plan Settings
         </span>
         {!open && (
           <span className="num font-extralight text-muted-foreground">

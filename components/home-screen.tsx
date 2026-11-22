@@ -18,8 +18,8 @@ export function HomeScreen() {
           <div className="flex min-w-0 flex-col gap-6">
             <p className="text-meta uppercase text-signal">HYROX + Norwegian Singles Method</p>
             <h1 className="font-display text-[2.5rem] leading-[48px] font-black tracking-tight md:text-[4rem] md:leading-[72px]">
-              Run at threshold.<br />
-              <span className="font-extralight">Race the stations.</span>
+              Run At Threshold.<br />
+              <span className="font-extralight">Race The Stations.</span>
             </h1>
             <p className="max-w-[56ch] text-hero-muted">
               Sub-threshold paces from your 5k or 10k PB, a Norwegian Singles run plan and a HYROX station program built around your race dates, with extra work where you lose time.

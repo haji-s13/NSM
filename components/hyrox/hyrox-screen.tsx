@@ -36,7 +36,7 @@ export function HyroxScreen() {
   return (
     <div className="flex flex-col gap-8">
       <section className="flex flex-col gap-2">
-        <h1 className="font-display text-[2rem] leading-10 font-black md:text-display">HYROX stations</h1>
+        <h1 className="font-display text-[2rem] leading-10 font-black md:text-display">HYROX Stations</h1>
         <p className="max-w-[65ch] text-muted-foreground">
           {hyrox.weeks.length} weeks of station and strength work in 12-week periods of three blocks: strength, station build, then race specific, with absorb weeks and a taper before each race. Running stays in your run plan, on the same dates. Set dates, races and time off on Profile.
         </p>

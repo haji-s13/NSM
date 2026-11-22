@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { Check, Copy } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Check, ChevronDown, Copy } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -9,6 +10,8 @@ import { useApp } from "@/components/app-provider";
 import { STATION, STATIONS, weakFor, type Station } from "@/lib/hyrox";
 import { fmtShortDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
+
+const OPEN_KEY = "nsm-hx-weak-collapsed";
 
 /** Pick weak stations: each gets more volume and one extra block a week. Runs are left to the run plan. */
 export function WeakStations() {
@@ -30,10 +33,16 @@ export function WeakStations() {
   const toggle = (st: Station) => setFor(sel, ordered(current.includes(st) ? current.filter((x) => x !== st) : [...current, st]));
   const copyToAll = () => updateHyrox({ weaknesses: current.slice(), weakByPeriod: periods.map(() => current.slice()) });
   const names = (list: Station[]) => (list.length ? list.map((k) => STATION[k].short).join(", ") : "None");
+  const [open, setOpen] = useState(true);
+  useEffect(() => { try { setOpen(localStorage.getItem(OPEN_KEY) !== "1"); } catch { /* ignore */ } }, []);
+  const openChange = (o: boolean) => { setOpen(o); try { localStorage.setItem(OPEN_KEY, o ? "0" : "1"); } catch { /* ignore */ } };
   return (
-    <section className="flex flex-col gap-4 rounded-lg border bg-card p-4 md:p-6">
+    <Collapsible open={open} onOpenChange={openChange} className="rounded-lg border bg-card">
+      <CollapsibleTrigger className="flex w-full items-center gap-2 p-4 text-left font-black hover:bg-accent/60 focus-visible:outline-2 focus-visible:outline-ring md:px-6">
+        <ChevronDown className={`size-4 transition-transform ${open ? "" : "-rotate-90"}`} aria-hidden /> Weak Stations
+      </CollapsibleTrigger>
+      <CollapsibleContent className="flex flex-col gap-4 border-t p-4 md:p-6">
       <div className="flex flex-col gap-1">
-        <h2 className="font-black">Weak stations</h2>
         <p className="max-w-[65ch] font-extralight text-muted-foreground">
           Each one you pick gets more sets in its regular work, one extra station block a week matched to the phase (strength, then capacity, then race-specific), and gym work for the muscles it relies on, added to a strength day.
         </p>
@@ -95,6 +104,7 @@ export function WeakStations() {
           </SelectContent>
         </Select>
       </div>
-    </section>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }

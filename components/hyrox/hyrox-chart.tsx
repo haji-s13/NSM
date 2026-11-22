@@ -98,7 +98,7 @@ export function HyroxChart() {
 
       <div className="flex flex-col gap-2 border-t pt-4">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h3 className="text-meta uppercase text-muted-foreground">{nW}-week station volume</h3>
+          <h3 className="text-meta uppercase text-muted-foreground">{nW}-Week Station Volume</h3>
           <p className="text-meta text-muted-foreground">× race distance</p>
         </div>
         <ul className="flex flex-col gap-2">

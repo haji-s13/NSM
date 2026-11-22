@@ -39,7 +39,7 @@ export function NewPasswordCard() {
     <main className="mx-auto grid max-w-6xl gap-8 px-[max(16px,env(safe-area-inset-left))] py-8 md:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] md:gap-16 md:px-8 md:py-16">
       <section className="flex min-w-0 flex-col gap-4">
         <p className="text-meta uppercase text-signal">Account</p>
-        <h1 className="font-display text-[2rem] leading-10 font-black md:text-display">Set a new password</h1>
+        <h1 className="font-display text-[2rem] leading-10 font-black md:text-display">Set A New Password</h1>
         <p className="max-w-[65ch] text-muted-foreground">Choose a new password for your planner account. You&apos;ll stay signed in on this device.</p>
       </section>
       <Card className="gap-0 py-0">

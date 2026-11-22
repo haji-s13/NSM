@@ -70,7 +70,7 @@ export function MyPlans() {
   return (
     <section className="flex flex-col gap-4 rounded-lg border bg-card p-4 md:p-6">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="font-black">My plans</h2>
+        <h2 className="font-black">My Plans</h2>
         {currentPlan && <p className="font-extralight text-muted-foreground">Editing “{currentPlan.name}”</p>}
       </div>
       <p className="-mt-2 font-extralight text-muted-foreground">Each plan saves your run plan and HYROX plan together, with one start date.</p>

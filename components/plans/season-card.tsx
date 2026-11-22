@@ -126,7 +126,7 @@ export function SeasonCard() {
 
         <section className="flex flex-col gap-2">
           <div className="flex items-center justify-between gap-2">
-            <h3 className="font-black">Time off</h3>
+            <h3 className="font-black">Time Off</h3>
             <Button size="sm" variant="outline" onClick={addVac}><Plus aria-hidden /> Add time off</Button>
           </div>
           <p className="font-extralight text-muted-foreground">Block single days or whole weeks. Five or more days off makes it a vacation week: volume pauses, and the week after holds instead of rising.</p>
