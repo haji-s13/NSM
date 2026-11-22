@@ -9,6 +9,7 @@ import { HyroxDayRow } from "@/components/hyrox/hyrox-day-row";
 import { useHxSend } from "@/components/hyrox/use-hx-send";
 import { addDays, mondayOf } from "@/lib/calendar";
 import { dist, fmtDuration, isoDate, parseDate } from "@/lib/format";
+import { dayKm, daySec } from "@/lib/plan";
 import { cn } from "@/lib/utils";
 
 const VIEWS = [1, 3, 7] as const;
@@ -18,6 +19,7 @@ const VIEW_KEY = "nsm-dash-view";
 const RUN_DOT: Record<string, string> = {
   easy: "bg-session-easy-ink", longrun: "bg-session-long-ink", race: "bg-session-race-ink",
   short: "bg-session-subt-ink", medium: "bg-session-subt-ink", long: "bg-session-subt-ink", hills: "bg-session-subt-ink",
+  double: "bg-session-subt-ink", single: "bg-session-subt-ink", x: "bg-session-long-ink",
 };
 const HX_DOT: Record<string, string> = {
   aerobic: "bg-session-easy-ink", lower: "bg-session-long-ink", upper: "bg-session-long-ink",
@@ -57,7 +59,7 @@ export function DashboardScreen() {
     if (!at) return t;
     const run = plan?.weeks[at.w]?.days[at.i];
     const hx = hyrox.weeks[at.w]?.days[at.i];
-    return { km: t.km + (run?.km || 0), runSec: t.runSec + (run?.sec || 0), hxMin: t.hxMin + (hx && hx.type !== "race" ? hx.min : 0) };
+    return { km: t.km + (run ? dayKm(run) : 0), runSec: t.runSec + (run ? daySec(run) : 0), hxMin: t.hxMin + (hx && hx.type !== "race" ? hx.min : 0) };
   }, { km: 0, runSec: 0, hxMin: 0 });
 
   const isToday = sameDay(selDate, today());

@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useApp } from "@/components/app-provider";
 import { dist, fmtShortDate } from "@/lib/format";
+import { dayKm } from "@/lib/plan";
 import { hxDayDate, hxDayText, type HxDayType, type HxWeek } from "@/lib/hyrox";
 import { DAYS } from "@/lib/settings";
 import { copyText } from "@/lib/workout-text";
@@ -33,7 +34,7 @@ export function HyroxDayRow({ wk, i, onIcu, busy, hideRun = false }: { wk: HxWee
   const { plan, settings } = useApp();
   const d = wk.days[i];
   const run = plan?.weeks[wk.n - 1]?.days[i];
-  const runLine = !hideRun && run && run.type !== "rest" && run.km > 0 ? `${run.type === "easy" ? (run.strides ? "Easy + strides" : "Easy") : run.title} ${dist(run.km, settings.units)}` : null;
+  const runLine = !hideRun && run && run.type !== "rest" && run.km > 0 ? `${run.type === "easy" ? (run.strides ? "Easy + strides" : "Easy") : run.title} ${dist(dayKm(run), settings.units)}` : null;
   const empty = d.type === "off" || !d.blocks.length;
 
   async function copy() {

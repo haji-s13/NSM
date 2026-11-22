@@ -117,7 +117,7 @@ export function VolumeChart() {
           [`${n}-week total`, dist(total, u, 0)],
           ["Weekly average", dist(total / n, u, 0)],
           ["Avg time / week", fmtDuration(time / n)],
-          ["Sub-T reps", `${dist(subt, u, 0)} · ${Math.round((subt / total) * 100)}%`],
+          [settings.runMethod === "bakken" ? "Threshold reps" : "Sub-T reps", `${dist(subt, u, 0)} · ${Math.round((subt / total) * 100)}%`],
         ].map(([k, v]) => (
           <div key={k} className="min-w-0">
             <dt className="text-meta uppercase text-muted-foreground">{k}</dt>

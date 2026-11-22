@@ -3,8 +3,8 @@
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
 import { useApp } from "@/components/app-provider";
-import { COROS_TOOL, corosCourse, corosErrorMessage, corosSent, dateKey, inCorosWindow, markCorosSent, ymd, type CorosError, type CorosItem } from "@/lib/coros";
-import { icuEvent, icuPush } from "@/lib/intervals";
+import { COROS_TOOL, corosCourse, corosErrorMessage, corosSent, dateKey, inCorosWindow, itemKey, markCorosSent, ymd, type CorosError, type CorosItem } from "@/lib/coros";
+import { icuEvents, icuPush } from "@/lib/intervals";
 import { copyText, workoutText } from "@/lib/workout-text";
 import type { Week } from "@/lib/plan";
 
@@ -24,7 +24,7 @@ export function useSend() {
     if (!model || !items.length) return;
     setBusy(key);
     try {
-      const n = await icuPush(settings.icuAthlete, items.map(({ wk, i }) => icuEvent(wk, i, settings.units, model.paces)));
+      const n = await icuPush(settings.icuAthlete, items.flatMap(({ wk, i }) => icuEvents(wk, i, settings.units, model.paces)));
       toast.success(`Sent ${n} workout${n === 1 ? "" : "s"} (${label}) to intervals.icu.`);
     } catch (e) {
       toast.error((e as Error).message);
@@ -42,8 +42,8 @@ export function useSend() {
       for (const it of items) {
         if (!inCorosWindow(it.date)) { skipped++; continue; }
         if (items.length > 1) toast.loading(`Sending ${sent + 1} of ${items.length} to COROS…`, { id });
-        await coros.client.callTool(coros.server, COROS_TOOL, { date: ymd(it.date), course: corosCourse(it.wk, it.wk.days[it.i], settings.units, model.paces) });
-        markCorosSent(dateKey(it.date));
+        await coros.client.callTool(coros.server, COROS_TOOL, { date: ymd(it.date), course: corosCourse(it.wk, it.pm ? it.wk.days[it.i].pm! : it.wk.days[it.i], settings.units, model.paces) });
+        markCorosSent(itemKey(it));
         sent++;
       }
       const skip = skipped ? ` ${skipped} skipped: COROS only accepts dates up to 90 days ahead.` : "";

@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useApp } from "@/components/app-provider";
 import { dayDate, type Week } from "@/lib/plan";
+import { dayItems } from "@/lib/coros";
 import { useSend } from "./use-send";
 
 /** Copy, Send (intervals.icu) and COROS for one day. */
@@ -19,7 +20,7 @@ export function DayActions({ wk, i }: { wk: Week; i: number }) {
   const date = dayDate(wk, i);
   const key = `day-${wk.n}-${i}`;
   const sent = isSent(date);
-  const coros = () => sendCoros(key, [{ wk, i, date }], `week ${wk.n} day`);
+  const coros = () => sendCoros(key, dayItems(wk).filter((it) => it.i === i), `week ${wk.n} day`);
   return (
     <div className="flex flex-wrap gap-2">
       <Button size="sm" variant="outline" onClick={() => copy(wk, i)} aria-label={`Copy week ${wk.n} workout`}>

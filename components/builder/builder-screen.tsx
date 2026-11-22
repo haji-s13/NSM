@@ -10,11 +10,12 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useApp } from "@/components/app-provider";
 import { MyPlans } from "@/components/plans/my-plans";
+import { MethodSwitch } from "./method-switch";
 import { BlockHeading, PeriodHeading } from "@/components/plans/block-heading";
-import { corosSent, dateKey, dayItems } from "@/lib/coros";
+import { corosSent, dayItems, itemKey } from "@/lib/coros";
 import { dist, isoDate } from "@/lib/format";
 import { dayDate, MIN_EASY_KM } from "@/lib/plan";
-import { templateWarnings, DAYS } from "@/lib/settings";
+import { bakkenWarnings, templateWarnings, DAYS } from "@/lib/settings";
 import { PlanSettings } from "./plan-settings";
 import { WeekTemplateCard } from "./week-template";
 import { VolumeChart } from "./volume-chart";
@@ -29,18 +30,22 @@ export function BuilderScreen() {
   if (!plan || !model) {
     return <Alert><AlertDescription>Enter a valid PB on Profile to build a plan.</AlertDescription></Alert>;
   }
-  const warns = templateWarnings(settings.template);
+  const bakken = settings.runMethod === "bakken";
+  const warns = bakken ? bakkenWarnings(settings.bakkenTemplate) : templateWarnings(settings.template);
   if (plan.weeks.some((w) => w.tooLow)) warns.push(`Your volume is too low for this template, so some easy runs were raised to the ${dist(MIN_EASY_KM, settings.units)} minimum. Raise the volume or swap an easy day for rest.`);
-  const corosItems = plan.weeks.flatMap(dayItems).filter((it) => !corosSent()[dateKey(it.date)]);
+  const corosItems = plan.weeks.flatMap(dayItems).filter((it) => !corosSent()[itemKey(it)]);
   const icuItems = plan.weeks.flatMap((wk) => wk.days.map((_, i) => ({ wk, i }))).filter(({ wk, i }) => wk.days[i].type !== "rest");
 
   function csv() {
     const rows = [["Week", "Phase", "Date", "Day", "Session", "Distance (km)", "Est. minutes"]];
-    plan!.weeks.forEach((wk) => wk.days.forEach((d, i) => rows.push([String(wk.n), wk.phase, isoDate(dayDate(wk, i)), DAYS[i], d.title, d.km ? d.km.toFixed(1) : "", d.sec ? String(Math.round(d.sec / 60)) : ""])));
+    plan!.weeks.forEach((wk) => wk.days.forEach((d, i) => {
+      rows.push([String(wk.n), wk.phase, isoDate(dayDate(wk, i)), DAYS[i], d.pm ? "AM threshold" : d.title, d.km ? d.km.toFixed(1) : "", d.sec ? String(Math.round(d.sec / 60)) : ""]);
+      if (d.pm) rows.push([String(wk.n), wk.phase, isoDate(dayDate(wk, i)), DAYS[i], d.pm.title, d.pm.km.toFixed(1), String(Math.round(d.pm.sec / 60))]);
+    }));
     const blob = new Blob([rows.map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(",")).join("\r\n")], { type: "text/csv" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = "norwegian-singles-run-plan.csv";
+    a.download = bakken ? "norwegian-method-run-plan.csv" : "norwegian-singles-run-plan.csv";
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   }
@@ -50,9 +55,13 @@ export function BuilderScreen() {
       <section className="flex flex-col gap-2">
         <h1 className="font-display text-[2rem] leading-10 font-black md:text-display">Run Plan</h1>
         <p className="max-w-[65ch] text-muted-foreground">
-          {plan.weeks.length} weeks in {calendar.periods.length} period{calendar.periods.length === 1 ? "" : "s"} of 12 weeks, each ramping to its own peak mileage, three sub-threshold sessions, one long run. Everything else is easy. Set dates, races and time off on Profile.
+          {plan.weeks.length} weeks in {calendar.periods.length} period{calendar.periods.length === 1 ? "" : "s"} of 12 weeks, {bakken
+            ? "two double threshold days (a controlled morning session and a slightly faster afternoon one) and an X session of short, fast reps, one long run."
+            : "three sub-threshold sessions, one long run."} Everything else is easy. Set dates, races and time off on Profile.
         </p>
       </section>
+
+      <MethodSwitch />
 
       <MyPlans />
       <PlanSettings />

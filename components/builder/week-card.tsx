@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useApp } from "@/components/app-provider";
 import { dist, fmtDuration, fmtShortDate } from "@/lib/format";
 import { changeVsLastFull, type Week } from "@/lib/plan";
-import { corosSent, dateKey, dayItems } from "@/lib/coros";
+import { corosSent, dayItems, itemKey } from "@/lib/coros";
 import { cn } from "@/lib/utils";
 import { DayCell } from "./day-cell";
 import { useSend } from "./use-send";
@@ -24,7 +24,7 @@ export function WeekCard({ wk, weeks }: { wk: Week; weeks: Week[] }) {
   const change = changeVsLastFull(weeks, wk.n - 1);
   if (!model) return null;
   const icuItems = wk.days.map((d, i) => ({ wk, i })).filter(({ i }) => wk.days[i].type !== "rest");
-  const corosItems = dayItems(wk).filter((it) => !corosSent()[dateKey(it.date)]);
+  const corosItems = dayItems(wk).filter((it) => !corosSent()[itemKey(it)]);
 
   return (
     <article className="overflow-hidden rounded-lg border bg-card">
