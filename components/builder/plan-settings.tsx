@@ -10,6 +10,8 @@ import { Switch } from "@/components/ui/switch";
 import { useApp } from "@/components/app-provider";
 import { KM_PER_MI, dist, fmtShortDate, unitDist } from "@/lib/format";
 import { periodVolume } from "@/lib/settings";
+import { Plus, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 const OPEN_KEY = "nsm-settings-collapsed";
 
@@ -49,64 +51,7 @@ export function PlanSettings() {
         )}
       </CollapsibleTrigger>
       <CollapsibleContent className="flex flex-col gap-6 border-t p-4 md:p-6">
-        <section className="flex flex-col gap-2">
-          <h3 className="font-black">Mileage by period</h3>
-          <p className="max-w-[65ch] font-extralight text-muted-foreground">
-            Switch on Ramp up for the periods you want to build mileage in: they go from start to peak at most 5% a week. Other periods hold a steady volume.
-          </p>
-          <ul className="flex flex-col gap-2">
-            {calendar.periods.map((p) => {
-              const v = periodVolume(s, p.i);
-              const info = plan?.periods[p.i];
-              const setP = (patch: { ramp?: boolean; start?: number; peak?: number }) => {
-                // Built from the latest settings, so quick edits can't overwrite each other.
-                update((cur) => {
-                  const pv = (cur.periodVolumes || []).slice();
-                  if (p.i === 0) {
-                    if (patch.ramp !== undefined) pv[0] = { ...(pv[0] || {}), ramp: patch.ramp };
-                    return { periodVolumes: pv, ...(patch.start !== undefined && { startVolume: patch.start }), ...(patch.peak !== undefined && { peakVolume: patch.peak }) };
-                  }
-                  const now = periodVolume(cur, p.i);
-                  pv[p.i] = { ...(pv[p.i] || {}), ...(patch.ramp !== undefined && { ramp: patch.ramp, start: now.start, peak: now.peak }), ...(patch.start !== undefined && { start: patch.start }), ...(patch.peak !== undefined && { peak: patch.peak }) };
-                  return { periodVolumes: pv };
-                });
-              };
-              return (
-                <li key={p.i} className="grid grid-cols-2 gap-x-4 gap-y-2 rounded-lg border p-2 md:grid-cols-[200px_140px_140px_minmax(0,1fr)] md:items-end md:p-3">
-                  <div className="col-span-2 flex flex-wrap items-center justify-between gap-2 md:col-span-4">
-                    <p>
-                      <span className="font-black">Period {p.i + 1}</span>{" "}
-                      <span className="num font-extralight text-muted-foreground">{fmtShortDate(p.start)} – {fmtShortDate(p.end)}</span>
-                    </p>
-                    <label htmlFor={`pv-ramp-${p.i}`} className="flex min-h-12 items-center gap-2 md:min-h-10">
-                      <Switch id={`pv-ramp-${p.i}`} checked={v.ramp} onCheckedChange={(on) => setP({ ramp: on })} />
-                      <span>Ramp up</span>
-                    </label>
-                  </div>
-                  {v.ramp ? (
-                    <>
-                      <Field id={`pv-start-${p.i}`} label="Start" hint={`${unitDist(u)}/wk`}>
-                        <Input id={`pv-start-${p.i}`} className="num" type="number" inputMode="numeric" min={10} max={250} value={v.start} onChange={(e) => setP({ start: num(e.target.value) })} />
-                      </Field>
-                      <Field id={`pv-peak-${p.i}`} label="Peak" hint={`${unitDist(u)}/wk`}>
-                        <Input id={`pv-peak-${p.i}`} className="num" type="number" inputMode="numeric" min={15} max={250} value={v.peak} onChange={(e) => setP({ peak: num(e.target.value) })} />
-                      </Field>
-                    </>
-                  ) : (
-                    <Field id={`pv-hold-${p.i}`} label="Hold at" hint={`${unitDist(u)}/wk`}>
-                      <Input id={`pv-hold-${p.i}`} className="num" type="number" inputMode="numeric" min={10} max={250} value={v.start} onChange={(e) => setP({ start: num(e.target.value) })} />
-                    </Field>
-                  )}
-                  {info && (
-                    <p className="col-span-2 font-extralight text-muted-foreground md:col-span-1 md:self-center">
-                      {!v.ramp ? "Steady volume, lighter every 4th week" : info.peakWeek ? `Peak in week ${info.peakWeek}` : info.maxKm ? `Reaches ${dist(info.maxKm, u, 0)}, short of the peak at 5% a week` : "Only taper, race or lighter weeks"}
-                    </p>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </section>
+        <MileageByPeriod />
         <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
           <Field id="subt-share" label="Sub-T share" hint="% of volume">
             <Input id="subt-share" className="num" type="number" inputMode="numeric" min={10} max={35} value={s.subtShare} onChange={(e) => update({ subtShare: num(e.target.value) })} />
@@ -148,5 +93,87 @@ export function PlanSettings() {
         )}
       </CollapsibleContent>
     </Collapsible>
+  );
+}
+
+/** Condensed mileage: only ramping periods get inputs; runs of holding periods share one line. */
+function MileageByPeriod() {
+  const { settings: s, update, plan, calendar } = useApp();
+  const u = s.units;
+  const num = (v: string) => Number(v) || 0;
+  const vols = calendar.periods.map((p) => periodVolume(s, p.i));
+  const [pick, setPick] = useState<string>("");
+
+  // Built from the latest settings, so quick edits can't overwrite each other.
+  const setP = (i: number, patch: { ramp?: boolean; start?: number; peak?: number }) => update((cur) => {
+    const pv = (cur.periodVolumes || []).slice();
+    if (i === 0) {
+      if (patch.ramp !== undefined) pv[0] = { ...(pv[0] || {}), ramp: patch.ramp };
+      return { periodVolumes: pv, ...(patch.start !== undefined && { startVolume: patch.start }), ...(patch.peak !== undefined && { peakVolume: patch.peak }) };
+    }
+    if (patch.ramp === false) { pv[i] = { ramp: false }; return { periodVolumes: pv }; }
+    const now = periodVolume(cur, i);
+    pv[i] = { ...(pv[i] || {}), ...(patch.ramp && { ramp: true, start: now.ramp ? now.start : Math.round(now.peak * 0.85), peak: now.ramp ? now.peak : Math.round(now.peak * 1.1) }),
+      ...(patch.start !== undefined && { start: patch.start }), ...(patch.peak !== undefined && { peak: patch.peak }) };
+    return { periodVolumes: pv };
+  });
+
+  // Group consecutive holding periods at the same volume.
+  type Row = { kind: "ramp"; i: number } | { kind: "hold"; from: number; to: number; at: number };
+  const rows: Row[] = [];
+  calendar.periods.forEach((p) => {
+    const v = vols[p.i];
+    const last = rows[rows.length - 1];
+    if (v.ramp) rows.push({ kind: "ramp", i: p.i });
+    else if (last?.kind === "hold" && last.at === v.start && last.to === p.i - 1) last.to = p.i;
+    else rows.push({ kind: "hold", from: p.i, to: p.i, at: v.start });
+  });
+  const holding = calendar.periods.filter((p) => !vols[p.i].ramp);
+  const span = (a: number, b: number) => `${fmtShortDate(calendar.periods[a].start)} – ${fmtShortDate(calendar.periods[b].end)}`;
+
+  return (
+    <section className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h3 className="font-black">Mileage</h3>
+        <p className="text-meta text-muted-foreground">ramps rise at most 5% a week</p>
+      </div>
+      <ul className="flex flex-col divide-y rounded-lg border">
+        {rows.map((r) => r.kind === "ramp" ? (
+          <li key={`r${r.i}`} className="flex flex-wrap items-center gap-x-4 gap-y-2 p-2 md:px-3">
+            <p className="min-w-0 flex-1 basis-40">
+              <span className="font-black">Period {r.i + 1}</span>{" "}
+              <span className="num font-extralight text-muted-foreground">{span(r.i, r.i)}</span>
+              <span className="block text-meta text-muted-foreground">
+                {plan?.periods[r.i]?.peakWeek ? `Ramp · peak in week ${plan.periods[r.i]!.peakWeek}` : `Ramp · reaches ${dist(plan?.periods[r.i]?.maxKm || 0, u, 0)}`}
+              </span>
+            </p>
+            <span className="flex items-center gap-2">
+              <Input aria-label={`Period ${r.i + 1} start`} id={`pv-start-${r.i}`} className="num w-20 px-2 text-center" type="number" inputMode="numeric" min={10} max={250} value={vols[r.i].start} onChange={(e) => setP(r.i, { start: num(e.target.value) })} />
+              <span aria-hidden>→</span>
+              <Input aria-label={`Period ${r.i + 1} peak`} id={`pv-peak-${r.i}`} className="num w-20 px-2 text-center" type="number" inputMode="numeric" min={15} max={250} value={vols[r.i].peak} onChange={(e) => setP(r.i, { peak: num(e.target.value) })} />
+              <span className="text-muted-foreground">{unitDist(u)}/wk</span>
+              <Button size="icon" variant="ghost" onClick={() => setP(r.i, { ramp: false })} aria-label={`Stop ramping period ${r.i + 1}`}><X aria-hidden /></Button>
+            </span>
+          </li>
+        ) : (
+          <li key={`h${r.from}`} className="flex flex-wrap items-baseline gap-x-2 p-2 text-muted-foreground md:px-3">
+            <span className="font-black text-foreground">{r.from === r.to ? `Period ${r.from + 1}` : `Periods ${r.from + 1}–${r.to + 1}`}</span>
+            <span className="num font-extralight">{span(r.from, r.to)}</span>
+            <span>holds <span className="num text-foreground">{r.at} {unitDist(u)}/wk</span></span>
+          </li>
+        ))}
+      </ul>
+      {holding.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <Select value={pick} onValueChange={setPick}>
+            <SelectTrigger aria-label="Period to ramp up" className="w-48"><SelectValue placeholder="Ramp up a period…" /></SelectTrigger>
+            <SelectContent>
+              {holding.map((p) => <SelectItem key={p.i} value={String(p.i)}>Period {p.i + 1} · {span(p.i, p.i)}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Button size="sm" variant="outline" disabled={pick === ""} onClick={() => { setP(Number(pick), { ramp: true }); setPick(""); }}><Plus aria-hidden /> Add ramp</Button>
+        </div>
+      )}
+    </section>
   );
 }
