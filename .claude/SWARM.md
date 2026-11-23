@@ -1,6 +1,6 @@
 # Claude coding swarm (Claude Code subagents)
 
-A lead Claude (your normal Claude Code session) plus four worker subagents:
+A lead Claude (your normal Claude Code session) plus four worker subagents (this repo also has a `researcher` agent, described in the root `CLAUDE.md`):
 
 | Agent | Model | Can edit? | Job |
 | --- | --- | --- | --- |
