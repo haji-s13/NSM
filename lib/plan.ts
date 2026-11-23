@@ -84,6 +84,10 @@ export interface Week {
   pos: number;
   vacation: boolean;
   raceNames: string[];
+  /** Last week of a 12-week period: a 5k test that sets the next period's paces. */
+  testWeek: boolean;
+  /** The VDOT whose paces this week uses. */
+  vdot: number;
 }
 
 export interface Plan {
@@ -111,8 +115,7 @@ function sessionSeconds(d: Session, p: Paces): number {
   return t + work + (r.n - 1) * r.recS;
 }
 
-export function buildPlan(s: Settings, m: Model, cal: Calendar): Plan {
-  const p = m.paces;
+export function buildPlan(s: Settings, m: Model, cal: Calendar, models?: (Model | null)[]): Plan {
   const vol = (p: number) => {
     const v = periodVolume(s, p);
     const a = Math.max(toKm(v.start, s) || 0, 10);
@@ -132,6 +135,8 @@ export function buildPlan(s: Settings, m: Model, cal: Calendar): Plan {
   let hold = false; // no increase in the first week back from a vacation
   for (const cw of cal.weeks) {
     const w = cw.i;
+    const pm = models?.[cw.period] ?? m;
+    const p = pm.paces;
     // Each 12-week period ramps from its own start volume toward its own peak.
     const newPeriod = cw.pos === 0 && cw.blockInPeriod === 0;
     if (newPeriod) {
@@ -144,8 +149,10 @@ export function buildPlan(s: Settings, m: Model, cal: Calendar): Plan {
     const raceWeek = cw.role === "race";
     const preTaper = cw.role === "taper";
     const finalTest = cw.last && !raceWeek && s.finalWeek !== "normal";
-    const taper = raceWeek || preTaper || finalTest;
-    const deload = s.deloads && cw.pos === 3 && cw.role === "load" && !finalTest;
+    // Last week of a non-final 12-week period: a 5k test that sets the next period's paces.
+    const testWeek = cw.blockInPeriod === 2 && cw.pos === 3 && !cw.last && cw.role === "load";
+    const taper = raceWeek || preTaper || finalTest || testWeek;
+    const deload = s.deloads && cw.pos === 3 && cw.role === "load" && !finalTest && !testWeek;
     if (w > 0 && !newPeriod && !taper && !deload && !vacation) {
       if (hold) hold = false;
       else level = Math.min(peakKm, level * (1 + MAX_WEEKLY_INCREASE));
@@ -153,7 +160,7 @@ export function buildPlan(s: Settings, m: Model, cal: Calendar): Plan {
     const targetKm = vacation ? level * VACATION_FACTOR
       : raceWeek || finalTest ? level * TAPER_FACTOR
       : preTaper ? level * PRE_TAPER_FACTOR
-      : deload ? level * DELOAD_FACTOR : level;
+      : deload || testWeek ? level * DELOAD_FACTOR : level;
     if (vacation) { hold = true; level *= 0.95; }
     const atPeak = level >= peakKm - 0.05;
     if (atPeak && !deload && !taper && !vacation && peakWeek === null) peakWeek = w + 1;
@@ -168,7 +175,7 @@ export function buildPlan(s: Settings, m: Model, cal: Calendar): Plan {
       // Low mileage: only the first double day stays double. Lighter and taper weeks drop one afternoon session.
       const lowKm = toKm(s.lowMileage, s);
       const doubles = tmpl.map((t, i) => (t === "double" ? i : -1)).filter((i) => i >= 0);
-      const keepDoubles = level < lowKm || deload || preTaper ? 1 : doubles.length;
+      const keepDoubles = level < lowKm || deload || testWeek || preTaper ? 1 : doubles.length;
       doubles.slice(keepDoubles).forEach((i) => { tmpl[i] = "single"; });
     }
     const notes: (Partial<Pick<Session, "off" | "note" | "title">> | undefined)[] = Array(7).fill(undefined);
@@ -190,8 +197,8 @@ export function buildPlan(s: Settings, m: Model, cal: Calendar): Plan {
         else { tmpl[day] = "rest"; notes[day] = { off: "hyrox", note: race.name || "HYROX race", title: "HYROX race" }; }
         if (day + 1 < 7 && !raceDays.includes(day + 1)) { tmpl[day + 1] = "rest"; notes[day + 1] = { note: "Recovery after the race" }; }
       }
-    } else if (finalTest) {
-      // Last week with no race: the last quality session becomes a time trial.
+    } else if (finalTest || testWeek) {
+      // Last week with no race (or a 5k test week): the last quality session becomes a time trial.
       let last = -1;
       tmpl.forEach((t, i) => { if (isQ(t)) last = i; });
       if (last === -1) last = 5;
@@ -214,7 +221,7 @@ export function buildPlan(s: Settings, m: Model, cal: Calendar): Plan {
     });
 
     // Bakken: threshold work is the threshold share of the week, split over the sessions (25–40 min of reps each).
-    const bk = bakken ? bakkenSessions(tmpl, targetKm, s, p, w, cw.blockInPeriod, raceWeek || preTaper || finalTest, deload || preTaper) : null;
+    const bk = bakken ? bakkenSessions(tmpl, targetKm, s, p, w, cw.blockInPeriod, raceWeek || preTaper || finalTest, deload || testWeek || preTaper) : null;
 
     const days: Session[] = tmpl.map((type, di): Session => {
       if (bk && (type === "double" || type === "single" || type === "x")) return bk(type);
@@ -222,11 +229,13 @@ export function buildPlan(s: Settings, m: Model, cal: Calendar): Plan {
       if (type === "easy") return { type, title: "Easy", km: 0, sec: 0 };
       if (type === "longrun") return { type, title: "Long run", km: 0, sec: 0 };
       if (type === "race") {
-        const r = m.races[raceKey];
-        const label = raceKey === "10k" ? "10k" : "5k";
+        const key = testWeek ? "5k" : raceKey;
+        const rKm = testWeek ? 5 : raceKm;
+        const r = pm.races[key];
+        const label = key === "10k" ? "10k" : "5k";
         return {
-          type, title: notes[di]?.title || `${label} time trial`,
-          km: raceKm + 5, sec: 0, wu: 3, cd: 2, raceKm, racePace: r.pace, raceTime: r.time, raceLabel: label,
+          type, title: testWeek ? "5k test" : notes[di]?.title || `${label} time trial`,
+          km: rKm + 5, sec: 0, wu: 3, cd: 2, raceKm: rKm, racePace: r.pace, raceTime: r.time, raceLabel: label,
         };
       }
       if (type === "hills") {
@@ -264,14 +273,14 @@ export function buildPlan(s: Settings, m: Model, cal: Calendar): Plan {
     days.forEach((d) => { d.sec = sessionSeconds(d, p); if (d.pm) d.pm.sec = sessionSeconds(d.pm, p); });
 
     const weekStart = cw.start;
-    const phase: Phase = vacation ? "Vacation" : raceWeek ? "Race week" : finalTest ? "Time trial" : preTaper ? "Taper" : `Block ${cw.blockInPeriod + 1}`;
+    const phase: Phase = vacation ? "Vacation" : raceWeek ? "Race week" : finalTest ? "Time trial" : testWeek ? "5k test" : preTaper ? "Taper" : `Block ${cw.blockInPeriod + 1}`;
     weeks.push({
-      n: w + 1, phase, phaseKey: raceWeek || finalTest ? "trial" : cw.phase, deload, taper, atPeak, fmt, days, weekStart, targetKm,
+      n: w + 1, phase, phaseKey: raceWeek || finalTest || testWeek ? "trial" : cw.phase, deload, taper, atPeak, fmt, days, weekStart, targetKm,
       peakKm, method: bakken ? "bakken" : "singles", period: cw.period, block: cw.block, pos: cw.pos, vacation, raceNames: cw.races.map((r) => r.race.name || "Race"),
       totalKm: days.reduce((a, d) => a + dayKm(d), 0),
       totalSec: days.reduce((a, d) => a + d.sec + (d.pm?.sec || 0), 0),
       subtKm: days.reduce((a, d) => a + (d.repKm || 0) + (d.pm?.repKm || 0), 0),
-      tooLow,
+      tooLow, testWeek, vdot: pm.vdot,
     });
   }
   return { weeks, startKm, peakKm: Math.max(...periods.map((p) => p.peakKm)), peakWeek, periods, blocks: cal.blocks };
