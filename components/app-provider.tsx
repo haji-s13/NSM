@@ -201,7 +201,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const calendar = useMemo(() => buildCalendar(settings.startDate, settings.endDate, settings.races, settings.vacations),
     [settings.startDate, settings.endDate, settings.races, settings.vacations]);
   const plan = useMemo(() => (model ? buildPlan(settings, model, calendar) : null), [settings, model, calendar]);
-  const hyrox = useMemo(() => buildHyrox(settings.hyrox, calendar, library), [settings.hyrox, calendar, library]);
+  // Norwegian Method: station sessions stay off the run plan's double threshold days.
+  const doubles = useMemo(() => (settings.runMethod === "bakken" && plan ? plan.weeks.map((w) => w.days.map((d) => d.type === "double")) : undefined),
+    [settings.runMethod, plan]);
+  const hyrox = useMemo(() => buildHyrox(settings.hyrox, calendar, library, doubles), [settings.hyrox, calendar, library, doubles]);
 
   const value: AppState = {
     ready, settings, update, replaceSettings, model, plan, hyrox, calendar, library, librarySource, refreshLibrary, updateHyrox, screen, setScreen,

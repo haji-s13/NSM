@@ -660,7 +660,28 @@ function shortFallback(c: Ctx): HxBlock[] {
   return [{ label: "Main", min: 30, text: `4 × (${c.leg(400, "threshold")} + 400 m ski @ 2k pace + 8 s), 90 s rest. Last set: + 30–40 unbroken WB.` }];
 }
 
-export function buildHyrox(h: HyroxSettings, cal: Calendar, lib: LibSession[] = BUILTIN_SESSIONS): HxPlan {
+/**
+ * Moves station sessions off the run plan's double threshold days. Each one goes to the nearest
+ * day with no station session, no double and no vacation (the later day on a tie). A session with
+ * nowhere to go is dropped.
+ */
+export function moveOffDoubles(template: HxSlot[], doubles: readonly boolean[], blocked: readonly boolean[] = []): HxSlot[] {
+  const out = template.slice();
+  for (let i = 0; i < 7; i++) {
+    if (!doubles[i] || out[i] === "off") continue;
+    const slot = out[i];
+    out[i] = "off";
+    const free = (j: number) => j >= 0 && j < 7 && !doubles[j] && !blocked[j] && out[j] === "off";
+    for (let d = 1; d < 7; d++) {
+      const j = free(i + d) ? i + d : free(i - d) ? i - d : -1;
+      if (j >= 0) { out[j] = slot; break; }
+    }
+  }
+  return out;
+}
+
+/** `doubles[week][day]`: the run plan has a double threshold day there (Norwegian Method). */
+export function buildHyrox(h: HyroxSettings, cal: Calendar, lib: LibSession[] = BUILTIN_SESSIONS, doubles?: readonly (readonly boolean[])[]): HxPlan {
   const weeks: HxWeek[] = [];
   for (const cw of cal.weeks) {
     const spec = weekSpec(cw, h);
@@ -670,7 +691,9 @@ export function buildHyrox(h: HyroxSettings, cal: Calendar, lib: LibSession[] = 
     if (spec.kind === "race") days = raceWeek(c, cw.races);
     else if (spec.kind === "vacation") days = Array.from({ length: 7 }, (): HxDay => ({ type: "off", title: TITLES.off, blocks: [], min: 0, vol: {} }));
     else {
-      days = h.template.map((slot0, i) => {
+      const blocked = cw.off.map((off, i) => off || (i === 0 && cw.afterRace));
+      const tmpl = doubles?.[cw.i] ? moveOffDoubles(h.template, doubles[cw.i], blocked) : h.template;
+      days = tmpl.map((slot0, i) => {
         const slot: HxSlot = cw.off[i] ? "off" : slot0;
         const before = { ...c.vol };
         const day = dayFor(c, slot);
