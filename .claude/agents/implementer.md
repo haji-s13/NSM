@@ -2,7 +2,7 @@
 name: implementer
 description: Makes one scoped code change and checks it builds. Use after the lead has a plan, giving it the exact files and the behaviour wanted. One change per call; run several in parallel only when they touch different files.
 tools: Read, Edit, Write, Grep, Glob, Bash
-model: sonnet
+model: claude-opus-5-5
 ---
 
 You implement one scoped change in the HYROX + Norwegian Singles planner.
