@@ -1,16 +1,17 @@
 "use client";
 
+import { Fragment } from "react";
 import { Copy, Send } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useApp } from "@/components/app-provider";
 import { dist, fmtShortDate } from "@/lib/format";
 import { dayKm } from "@/lib/plan";
-import { hxDayDate, hxDayText, STATION, type HxDayType, type HxWeek } from "@/lib/hyrox";
+import { hxDayDate, hxDayText, numChanges, numParts, STATION, type HxDayType, type HxWeek } from "@/lib/hyrox";
 import { DAYS } from "@/lib/settings";
 import { copyText } from "@/lib/workout-text";
 import { cn } from "@/lib/utils";
-import { prettyBlock } from "@/lib/hx-format";
+import { prettyBlock, type HxPretty } from "@/lib/hx-format";
 import type { HxBlock } from "@/lib/hyrox";
 
 /** Same tints as the run plan: easy green for aerobic, blue for strength, orange for quality, red for tests and races. */
@@ -80,11 +81,38 @@ export function HyroxDayRow({ wk, i, onIcu, busy, hideRun = false }: { wk: HxWee
 /** Keep "30 s", "20 m", "× 10" together when lines wrap. */
 const keepUnits = (s: string) => s.replace(/(\d)\s(?=(s|m|kg|lb|min|km|cal|reps|%)\b)/g, "$1\u00a0").replace(/×\s/g, "×\u00a0");
 
+/** `now` with each number a weakness changed in bold signal, then the old value struck through.
+ *  Plain text when there is no baseline or the two don't line up number for number. */
+function Changed({ now, was }: { now: string; was?: string }) {
+  if (was === undefined || was === now) return <>{now}</>;
+  const a = numParts(was), b = numParts(now);
+  if (a.length !== b.length) return <>{now}</>;
+  return (
+    <>
+      {b.map((part, i) => (i % 2 && part !== a[i] ? (
+        <Fragment key={i}>
+          <span className="font-black tabular-nums text-signal">{part}</span>
+          <s className="ml-0.5 text-meta font-extralight tabular-nums text-muted-foreground" aria-label={`was ${a[i]}`}>{a[i]}</s>
+        </Fragment>
+      ) : part))}
+    </>
+  );
+}
+
+/** The baseline formatted the same way, if it has the same shape (lines, steps, cues) as the block. */
+function sameShape(p: HxPretty, q: HxPretty | null): HxPretty | null {
+  if (!q || q.lines.length !== p.lines.length || q.notes.length !== p.notes.length) return null;
+  return q.lines.every((l, i) => l.items.length === p.lines[i].items.length && !l.head === !p.lines[i].head) ? q : null;
+}
+
 /** One block: letter badge (A, B, C) or a tag (Weak, Accessory, Main), the work as a heading
  *  and a list of steps, then the coach's cues in small type. A block scaled up for weak
- *  stations keeps its badge and gets a "Weak · Lunges +25%" line. */
+ *  stations keeps its badge and gets a "Weak · Lunges +25%" line, and each number it changed shows the old value. */
 function BlockView({ b, pct }: { b: HxBlock; pct: number }) {
   const p = prettyBlock(keepUnits(b.text));
+  const w = sameShape(p, b.was ? prettyBlock(keepUnits(b.was)) : null);
+  const changes = b.was ? numChanges(b.was, b.text) : null;
+  const one = changes?.length === 1 ? ` · ${changes[0][0]} → ${changes[0][1]}` : "";
   const letter = /^[A-Z]$/.test(b.label);
   const station = b.label.split("· ")[1];
   const tag = b.weak ? `Weak station · ${station}` : b.acc ? `Accessory · ${station}` : letter || b.label === "Main" ? null : b.label;
@@ -96,22 +124,22 @@ function BlockView({ b, pct }: { b: HxBlock; pct: number }) {
       </span>
       <div className="flex min-w-0 flex-col gap-1">
         {tag && <p className={cn("text-meta uppercase", b.weak ? "text-signal" : "text-muted-foreground")}>{tag}</p>}
-        {!b.weak && b.boost?.length ? <p className="text-meta uppercase text-signal">Weak · {b.boost.map((st) => STATION[st].short).join(" · ")} +{pct}%</p> : null}
+        {!b.weak && b.boost?.length ? <p className="text-meta uppercase text-signal">Weak · {b.boost.map((st) => STATION[st].short).join(" · ")} +{pct}%{one}</p> : null}
         {p.lines.map((l, i) => (
           <div key={i} className="flex flex-col gap-0.5">
-            {l.head && <p className="font-black break-words">{l.head}</p>}
+            {l.head && <p className="font-black break-words"><Changed now={l.head} was={w?.lines[i].head} /></p>}
             {l.items.length > 0 && (
               <ul className="flex flex-col gap-0.5">
                 {l.items.map((it, j) => (
                   <li key={j} className="grid grid-cols-[12px_minmax(0,1fr)] items-baseline gap-x-1 break-words">
-                    <span className={cn("size-1.5 translate-y-[-2px] rounded-full", b.weak ? "bg-signal" : "bg-muted-foreground")} aria-hidden />{it}
+                    <span className={cn("size-1.5 translate-y-[-2px] rounded-full", b.weak ? "bg-signal" : "bg-muted-foreground")} aria-hidden /><span><Changed now={it} was={w?.lines[i].items[j]} /></span>
                   </li>
                 ))}
               </ul>
             )}
           </div>
         ))}
-        {p.notes.length > 0 && <p className="font-extralight text-muted-foreground">{p.notes.join(". ")}.</p>}
+        {p.notes.length > 0 && <p className="font-extralight text-muted-foreground"><Changed now={p.notes.join(". ")} was={w?.notes.join(". ")} />.</p>}
       </div>
     </li>
   );
