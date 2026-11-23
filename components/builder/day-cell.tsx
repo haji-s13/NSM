@@ -60,6 +60,7 @@ export function DayCell({ wk, i }: { wk: Week; i: number }) {
           <div className="flex min-w-0 flex-col gap-3 tabular-nums">
             <SessionLines wk={wk} d={d} label={d.pm ? "AM" : undefined} />
             {d.pm && <SessionLines wk={wk} d={d.pm} label="PM" />}
+            {d.note && <p className="font-extralight text-muted-foreground">{d.note}</p>}
           </div>
           <DayActions wk={wk} i={i} />
         </>

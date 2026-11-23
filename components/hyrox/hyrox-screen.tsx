@@ -6,8 +6,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useApp } from "@/components/app-provider";
 import { BlockHeading, PeriodHeading } from "@/components/plans/block-heading";
-import { hxCsv, linkWarnings } from "@/lib/hyrox";
-import { BAKKEN_HARD, DAYS, QUALITY } from "@/lib/settings";
+import { hxCsv, linkWarnings, type HxSlot } from "@/lib/hyrox";
+import { BAKKEN_HARD, DAYS, QUALITY, type BakkenSlot } from "@/lib/settings";
 import { HyroxSettingsCard } from "./hyrox-settings";
 import { WeakStations } from "./weak-stations";
 import { HyroxTemplateCard } from "./hyrox-template";
@@ -17,11 +17,17 @@ import { hxSendable, useHxSend } from "./use-hx-send";
 
 /** HYROX station program: settings, weak stations, template, chart, then the weeks. Runs stay in the run plan. */
 export function HyroxScreen() {
-  const { hyrox, settings, calendar } = useApp();
+  const { hyrox, settings, calendar, plan } = useApp();
   const { sendIcu, busy } = useHxSend();
   const h = settings.hyrox;
   const runHard = settings.runMethod === "bakken" ? settings.bakkenTemplate.map((t) => (BAKKEN_HARD.includes(t) ? "short" : "easy")) : settings.template;
-  const warns = linkWarnings(h.template, runHard, QUALITY, DAYS);
+  // Norwegian Method: sessions move week to week around the doubles, so check the built weeks.
+  const warns = settings.runMethod === "bakken" && plan
+    ? [...new Set(hyrox.weeks.flatMap((wk, w) => {
+        const run = plan.weeks[w]?.days.map((d) => (BAKKEN_HARD.includes(d.type as BakkenSlot) ? "short" : "easy"));
+        return run ? linkWarnings(wk.days.map((d) => d.type as HxSlot), run, QUALITY, DAYS) : [];
+      }))]
+    : linkWarnings(h.template, runHard, QUALITY, DAYS);
   if (!h.template.some((s) => s !== "off")) warns.unshift("Your template has no station sessions. Pick at least one day.");
   const all = hyrox.weeks.flatMap(hxSendable);
 

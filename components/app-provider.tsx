@@ -4,13 +4,16 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { User } from "@supabase/supabase-js";
 import { toast } from "sonner";
 import { buildModel, type Model } from "@/lib/vdot";
-import { buildPlan, type Plan, type Week } from "@/lib/plan";
-import { buildHyrox, type HxPlan, type HyroxSettings } from "@/lib/hyrox";
+import { buildPlan, type DayType, type Plan, type Week } from "@/lib/plan";
+import { buildHyrox, type HxPlan, type HyroxSettings, type RunDay } from "@/lib/hyrox";
 import { buildCalendar, type Calendar } from "@/lib/calendar";
 import { normalizeSettings, STORAGE_KEY, testForPeriod, type Settings } from "@/lib/settings";
 import { accountError, fetchSessions, latestSavedPlan, loadAccountSettings, saveAccountSettings, supabase } from "@/lib/supabase";
 import { BUILTIN_SESSIONS, type LibSession } from "@/lib/session-library";
 import { COROS_SERVER, corosConnected, corosHandleRedirect, directCoros, type CorosClient } from "@/lib/coros";
+
+/** Run-plan days the HYROX plan treats as hard (Norwegian Method). */
+const HARD_RUN: DayType[] = ["double", "single", "x", "race"];
 
 export type Screen = "dashboard" | "builder" | "hyrox" | "paces";
 type Entry = "guest" | "account" | null;
@@ -236,7 +239,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return { currentPeriod: cur, testsDue: due };
   }, [calendar, settings.paceTests, testWeeks]);
   const currentModel = models[currentPeriod] ?? model;
-  const hyrox = useMemo(() => buildHyrox(settings.hyrox, calendar, library), [settings.hyrox, calendar, library]);
+  // Norwegian Method: station sessions stay off the run plan's double threshold days. A string key keeps
+  // the HYROX plan from rebuilding when unrelated run settings change.
+  const runKey = settings.runMethod === "bakken" && plan
+    ? plan.weeks.map((w) => w.days.map((d) => (d.type === "double" ? "d" : HARD_RUN.includes(d.type) ? "h" : "e")).join("")).join("|")
+    : "";
+  const hyrox = useMemo(() => {
+    const runDays = runKey ? runKey.split("|").map((w) => [...w].map((c): RunDay => (c === "d" ? "double" : c === "h" ? "hard" : "easy"))) : undefined;
+    return buildHyrox(settings.hyrox, calendar, library, runDays);
+  }, [settings.hyrox, calendar, library, runKey]);
 
   const value: AppState = {
     ready, settings, update, replaceSettings, model, models, currentPeriod, currentModel, testsDue, testWeeks, plan, hyrox, calendar, library, librarySource, refreshLibrary, updateHyrox, screen, setScreen,

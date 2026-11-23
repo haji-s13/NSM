@@ -36,9 +36,11 @@ export function icuDescription(wk: Week, d: Session, u: Units, p: Paces): string
   if (d.wu) out.push(`- Warmup ${icuKm(d.wu)} ${easy}`, "");
   if (d.type === "race") out.push(`- ${d.title} ${icuKm(d.raceKm!)} ${icuPace(d.racePace!, u)} Pace`, "");
   else if (d.reps) {
-    const r = d.reps;
-    const step = r.stepKm ? (r.stepKm < 1 ? `${Math.round(r.stepKm * 1000)}mtr` : `${r.stepKm}km`) : r.stepMin < 1 ? `${Math.round(r.stepMin * 60)}s` : `${r.stepMin}m`;
-    out.push(`Main Set ${r.n}x`, `- ${step} ${icuRange(r.pace, u)}`, `- ${r.recLabel} ${r.recS}s ${easy}`, "");
+    for (const r of [d.reps, d.reps2]) {
+      if (!r) continue;
+      const step = r.stepKm ? (r.stepKm < 1 ? `${Math.round(r.stepKm * 1000)}mtr` : `${r.stepKm}km`) : r.stepMin < 1 ? `${Math.round(r.stepMin * 60)}s` : `${r.stepMin}m`;
+      out.push(`${r === d.reps ? "Main Set" : "Second Set"} ${r.n}x`, `- ${step} ${icuRange(r.pace, u)}`, `- ${r.recLabel} ${r.recS}s ${easy}`, "");
+    }
   }
   if (d.cd) out.push(`- Cooldown ${icuKm(d.cd)} ${easy}`);
   return out.join("\n");

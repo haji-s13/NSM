@@ -34,6 +34,8 @@ export interface Settings {
   repFormat: RepFormat;
   finalWeek: FinalWeek;
   deloads: boolean;
+  /** Norwegian Method: lighter 4th week. Off by default; Bakken kept weeks flat. */
+  bakkenDeloads: boolean;
   template: SessionType[];
   runMethod: RunMethod;
   /** Bakken weekly template. */
@@ -90,6 +92,7 @@ export function defaultSettings(): Settings {
     repFormat: "distance",
     finalWeek: "test",
     deloads: true,
+    bakkenDeloads: false,
     template: ["easy", "short", "easy", "medium", "easy", "long", "longrun"],
     runMethod: "singles",
     bakkenTemplate: ["easy", "double", "easy", "double", "easy", "x", "longrun"],
@@ -106,6 +109,7 @@ export function normalizeSettings(raw: unknown): Settings {
   if (s.runMethod !== "bakken") s.runMethod = "singles";
   if (!Array.isArray(s.bakkenTemplate) || s.bakkenTemplate.length !== 7) s.bakkenTemplate = d.bakkenTemplate.slice();
   if (!(Number(s.lowMileage) >= 0)) s.lowMileage = d.lowMileage;
+  if (typeof s.bakkenDeloads !== "boolean") s.bakkenDeloads = d.bakkenDeloads;
   s.hyrox = normalizeHyrox(s.hyrox);
   // Older saves were always 12 weeks with the race in week 12.
   const raw0 = (raw && typeof raw === "object" ? raw : {}) as Partial<Settings> & { hyrox?: { finalWeek?: string; raceDay?: number } };

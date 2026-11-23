@@ -42,7 +42,7 @@ export function HyroxTemplateCard() {
             </div>
           ))}
         </div>
-        <p className="font-extralight text-muted-foreground">Three station sessions a week plus an optional aerobic day. Keep hard runs off the day before lower and HYROX Quality sessions.</p>
+        <p className="font-extralight text-muted-foreground">Three station sessions a week plus an optional aerobic day. Keep hard runs off the day before lower and HYROX Quality sessions.{settings.runMethod === "bakken" && " Norwegian Method: a station session on a week's double threshold day moves to the nearest free day."}</p>
       </CollapsibleContent>
     </Collapsible>
   );

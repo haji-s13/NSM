@@ -13,9 +13,10 @@ export function mainLine(d: Session, u: Units, p: Paces): string {
   if (d.type === "hills") {
     return `${r.n} × 400 m @ ${rangeOf(r.pace, u)} (${fmtTime(r.pace.lo * 0.4)}–${fmtTime(r.pace.hi * 0.4)}), 30s rest`;
   }
-  if (!r.stepKm) return `${r.n} × ${r.stepMin < 1 ? `${Math.round(r.stepMin * 60)} s` : `${r.stepMin} min`} @ ${rangeOf(r.pace, u)}, ${r.recS}s jog`;
+  const rec = r.n > 1 ? `, ${r.recS}s jog` : "";
+  if (!r.stepKm) return `${r.n} × ${r.stepMin < 1 ? `${Math.round(r.stepMin * 60)} s` : `${r.stepMin} min`} @ ${rangeOf(r.pace, u)}${rec}`;
   const step = r.stepKm < 1 ? `${Math.round(r.stepKm * 1000)} m` : `${r.stepKm} km`;
-  return `${r.n} × ${step} @ ${rangeOf(r.pace, u)} (${fmtTime(r.pace.lo * r.stepKm)}–${fmtTime(r.pace.hi * r.stepKm)}), ${r.recS}s jog`;
+  return `${r.n} × ${step} @ ${rangeOf(r.pace, u)} (${fmtTime(r.pace.lo * r.stepKm)}–${fmtTime(r.pace.hi * r.stepKm)})${rec}`;
 }
 
 /** Plain-text workout for a Strava description (the Copy button). */
