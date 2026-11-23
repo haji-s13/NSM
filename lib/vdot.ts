@@ -44,6 +44,10 @@ export interface RaceResult { key: RaceKey; label: string; m: number; time: numb
 export interface Paces {
   easy: Range; marathon: Range; threshold: Range;
   short: Range; medium: Range; long: Range; hills: Range;
+  /** 3k to 5k pace: Norwegian Method X reps (about 5–8 mmol) and race-week checks. */
+  fast: Range;
+  /** Mile to 1500 m pace: short, fast X reps (200s). */
+  speed: Range;
 }
 
 export interface Model {
@@ -69,6 +73,7 @@ export function buildModel(pbDistance: string, pbTime: string, paceAdjust: numbe
   const adj = Number(paceAdjust) || 0;
   const band = (fast: number, slow: number, a = 0): Range => ({ lo: fast + a, hi: slow + a });
   const rp = (k: RaceKey) => races[k].pace;
+  const at = (m: number) => raceTimeForVdot(vdot, m) / (m / 1000);
   return {
     vdot, pbSec, pbM, races,
     paces: {
@@ -79,6 +84,8 @@ export function buildModel(pbDistance: string, pbTime: string, paceAdjust: numbe
       medium: band(rp("hm"), rp("25k"), adj),
       long: band(rp("25k"), rp("30k"), adj),
       hills: band(rp("10k"), rp("15k")),
+      fast: band(at(3000), rp("5k")),
+      speed: band(at(1500), at(1609.344)),
     },
   };
 }

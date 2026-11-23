@@ -26,8 +26,8 @@ export function corosCourse(wk: Week, d: Session, u: Units, p: Paces) {
     if (d.wu && d.wu > 0) sections.push({ sectionType: 1, targetType: 1, targetValue: metres(d.wu), ...easy });
     if (d.type === "race") {
       sections.push({ sectionType: 2, targetType: 1, targetValue: metres(d.raceKm!), ...onePace(d.racePace!) });
-    } else if (d.reps) {
-      const r = d.reps;
+    } else if (d.reps) for (const r of [d.reps, d.reps2]) {
+      if (!r) continue;
       const work = r.stepKm
         ? { sectionType: 2, targetType: 1, targetValue: metres(r.stepKm), ...paceTarget(r.pace) }
         : { sectionType: 2, targetType: 2, targetValue: r.stepMin * 60, ...paceTarget(r.pace) };
