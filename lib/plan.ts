@@ -19,6 +19,9 @@ const SUBT = {
   long: { name: "Sub-T long", distKm: 3, min: 10, recS: 90 },
 } as const;
 
+/** Fewest reps a sub-T session can be trimmed to when the week's share is tight. */
+const FLOOR = { short: 3, medium: 2, long: 1, hills: 6 } as const;
+
 const REPS = {
   short: { min: 4, max: 12, weight: 1, repKm: 0 },
   medium: { min: 2, max: 6, weight: 1, repKm: 0 },
@@ -50,6 +53,8 @@ export interface Session {
   reps?: Reps;
   /** A second set after the first (e.g. 300s after 1000s). */
   reps2?: Reps;
+  /** Fewest reps this session may be trimmed to so the week stays within its threshold share. */
+  minReps?: number;
   repKm?: number;
   raceKm?: number;
   racePace?: number;
@@ -217,7 +222,8 @@ export function buildPlan(s: Settings, m: Model, cal: Calendar): Plan {
     // Rep counts from the sub-T share of the week's volume, split by weight and clamped.
     const quality = tmpl.filter((t) => QUALITY.includes(t as SessionType)) as (keyof typeof REPS)[];
     const totalWeight = quality.reduce((a, t) => a + REPS[t].weight, 0);
-    const budget = (targetKm * (Number(s.subtShare) || 25)) / 100;
+    const share = Number(s.subtShare) || 25;
+    const budget = (targetKm * share) / 100;
     const counts: Partial<Record<keyof typeof REPS, number>> = {};
     quality.forEach((t) => {
       if (counts[t] != null) return;
@@ -234,7 +240,7 @@ export function buildPlan(s: Settings, m: Model, cal: Calendar): Plan {
       if (bk && di === preRace && type === "single") return bk.preRace();
       if (bk && (type === "double" || type === "single" || type === "x")) return bk.day(type);
       if (type === "rest") return { type, title: notes[di]?.title || (notes[di]?.off === "vacation" ? "Vacation" : "Rest"), km: 0, sec: 0, off: notes[di]?.off, note: notes[di]?.note };
-      if (type === "easy") return { type, title: "Easy", km: 0, sec: 0 };
+      if (type === "easy") return { type, title: "Easy", km: 0, sec: 0, note: notes[di]?.note };
       if (type === "longrun") return { type, title: "Long run", km: 0, sec: 0 };
       if (type === "race") {
         const r = m.races[raceKey];
@@ -248,7 +254,7 @@ export function buildPlan(s: Settings, m: Model, cal: Calendar): Plan {
         const n = counts.hills ?? REPS.hills.min;
         return {
           type, title: "400s / hills", sec: 0, wu, cd,
-          km: wu + n * 0.4 + (n - 1) * 0.08 + cd, repKm: n * 0.4,
+          km: wu + n * 0.4 + (n - 1) * 0.08 + cd, repKm: n * 0.4, minReps: Math.min(n, FLOOR.hills),
           reps: { n, stepKm: 0.4, stepMin: 0, recS: 30, pace: p.hills, recLabel: "Rest" },
         };
       }
@@ -259,11 +265,13 @@ export function buildPlan(s: Settings, m: Model, cal: Calendar): Plan {
       const repKm = fmt === "time" ? (n * sub.min * 60) / mid(pc) : n * sub.distKm;
       const recKm = (n - 1) * (sub.recS / 420); // slow jog ≈ 7:00/km
       return {
-        type, title: sub.name, sec: 0, wu, cd, repKm,
+        type, title: sub.name, sec: 0, wu, cd, repKm, minReps: Math.min(n, FLOOR[type]),
         km: wu + repKm + recKm + cd,
         reps: { n, stepKm: fmt === "time" ? null : sub.distKm, stepMin: sub.min, recS: sub.recS, pace: pc, recLabel: "Jog" },
       };
     });
+
+    fitShare(days, budget, `${share}% of the week`, bakken ? "threshold" : "sub-T");
 
     const firstEasy = days.find((d) => d.type === "easy");
     if (firstEasy) { firstEasy.title = "Easy + strides"; firstEasy.strides = true; }
@@ -308,6 +316,59 @@ export function changeVsLastFull(weeks: Week[], i: number): number | null {
   return null;
 }
 
+/* ---------- Keeping threshold work within the share ---------- */
+
+const repTotal = (days: Session[]) => days.reduce((a, d) => a + (d.repKm || 0) + (d.pm?.repKm || 0), 0);
+const repStepKm = (d: Session) => d.reps!.stepKm ?? (d.reps!.stepMin * 60) / mid(d.reps!.pace);
+const recStepKm = (d: Session) => (d.type === "hills" ? 0.08 : d.reps!.recS / 420); // slow jog ≈ 7:00/km
+
+/** One rep more or fewer: its distance and one recovery jog. */
+function changeReps(d: Session, by: 1 | -1) {
+  const r = d.reps!;
+  const km = (repStepKm(d) + recStepKm(d)) * by;
+  d.reps = { ...r, n: r.n + by };
+  d.repKm = (d.repKm || 0) + repStepKm(d) * by;
+  d.km += km;
+}
+
+/**
+ * Keeps the week's rep distance within its share of the volume.
+ * Trims reps (largest session first) down to each session's floor; if that's not enough, a
+ * double threshold day becomes a single session, then the session that frees the most becomes
+ * an easy run. Sessions that were trimmed get reps back if a dropped session left room.
+ */
+function fitShare(days: Session[], budget: number, shareText: string, kind: string) {
+  const over = () => repTotal(days) > budget + 1e-6;
+  if (!over()) return;
+  const sessions = () => days.flatMap((d) => (d.pm ? [d, d.pm] : [d])).filter((x) => x.reps && x.minReps != null);
+  const start = new Map(sessions().map((x) => [x, x.reps!.n]));
+  let dropped = false;
+  for (let guard = 0; over() && guard < 500; guard++) {
+    const trim = sessions().filter((x) => x.reps!.n > x.minReps!);
+    if (trim.length) { changeReps(trim.reduce((a, b) => ((b.repKm || 0) > (a.repKm || 0) ? b : a)), -1); continue; }
+    let i = -1;
+    days.forEach((d, j) => { if (d.pm) i = j; });
+    if (i >= 0) {
+      Object.assign(days[i], { pm: undefined, type: "single", title: "Threshold", note: `Single session, to keep ${kind} within ${shareText}` });
+      dropped = true;
+      continue;
+    }
+    // Drop the session that frees the most (its floor), the later one on a tie.
+    const floorKm = (d: Session) => (d.reps && d.minReps != null ? d.minReps * repStepKm(d) : d.repKm || 0);
+    days.forEach((d, j) => { if ((d.repKm || 0) > 0 && (i < 0 || floorKm(d) >= floorKm(days[i]))) i = j; });
+    if (i < 0) break;
+    days[i] = { type: "easy", title: "Easy", km: 0, sec: 0, note: `Easy instead of ${kind}, to keep it within ${shareText}` };
+    dropped = true;
+  }
+  if (!dropped) return;
+  // Give reps back to the sessions that are left, the most-trimmed first, while they still fit.
+  for (let guard = 0; guard < 500; guard++) {
+    const grow = sessions().filter((x) => x.reps!.n < (start.get(x) ?? x.reps!.n) && repTotal(days) + repStepKm(x) <= budget + 1e-6);
+    if (!grow.length) break;
+    changeReps(grow.reduce((a, b) => (b.reps!.n / start.get(b)! < a.reps!.n / start.get(a)! ? b : a)), 1);
+  }
+}
+
 /** A day's distance including a double day's afternoon session. */
 export const dayKm = (d: Session) => d.km + (d.pm?.km || 0);
 export const daySec = (d: Session) => d.sec + (d.pm?.sec || 0);
@@ -349,7 +410,9 @@ function bakkenSessions(tmpl: DayType[], targetKm: number, s: Settings, p: Paces
     const workSec = workMin(pace) * 60;
     const reps = fixedReps ?? clamp("km" in f ? workSec / mid(pace) / f.km : workSec / f.sec, f.lo, f.hi);
     const repKm = "km" in f ? reps * f.km : (reps * f.sec) / mid(pace);
-    return { type: "single", title, sec: 0, wu, cd, repKm, km: wu + repKm + jogKm(reps, f.rec) + cd,
+    const repSec = "km" in f ? f.km * mid(pace) : f.sec;
+    const minReps = fixedReps ?? Math.min(reps, Math.max(2, Math.ceil(600 / repSec))); // about 10 min, and always intervals
+    return { type: "single", title, sec: 0, wu, cd, repKm, minReps, km: wu + repKm + jogKm(reps, f.rec) + cd,
       reps: "km" in f
         ? { n: reps, stepKm: f.km, stepMin: 0, recS: f.rec, pace, recLabel: "Jog" }
         : { n: reps, stepKm: null, stepMin: f.sec / 60, recS: f.rec, pace, recLabel: "Jog" } };
@@ -391,7 +454,7 @@ function bakkenSessions(tmpl: DayType[], targetKm: number, s: Settings, p: Paces
     const reps: Reps = { n: n1, stepKm: 1, stepMin: 0, recS: 90, pace: p.fast, recLabel: "Jog" };
     const reps2: Reps = { n: n2, stepKm: 0.3, stepMin: 0, recS: 60, pace: p.fast, recLabel: "Jog" };
     const repKm = n1 + n2 * 0.3;
-    return { type: "x", title: "Race check · 1000s + 300s", sec: 0, wu: wuX, cd: cdX, repKm, reps, reps2,
+    return { type: "x", title: "Race check · 1000s + 300s", sec: 0, wu: wuX, cd: cdX, reps, reps2,
       km: wuX + repKm + jogKm(n1, 90) + jogKm(n2, 60) + 90 / 420 + cdX,
       mainText: `${n1} × 1000 m, 90s jog, then ${n2} × 300 m, 60s jog, all @ ${rangeOfPace(p.fast, s)}. Controlled: if it feels harder than it should at this pace, stop early.` };
   };
