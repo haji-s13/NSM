@@ -660,29 +660,42 @@ function shortFallback(c: Ctx): HxBlock[] {
   return [{ label: "Main", min: 30, text: `4 × (${c.leg(400, "threshold")} + 400 m ski @ 2k pace + 8 s), 90 s rest. Last set: + 30–40 unbroken WB.` }];
 }
 
+/** A run-plan day as the HYROX plan sees it. */
+export type RunDay = "double" | "hard" | "easy";
+
+const FRESH: HxSlot[] = ["lower", "quality", "quality_short"];
+
 /**
- * Moves station sessions off the run plan's double threshold days. Each one goes to the nearest
- * day with no station session, no double and no vacation (the later day on a tie). A session with
- * nowhere to go is dropped.
+ * Moves station sessions off the run plan's double threshold days to the nearest free day (no
+ * station session, no double, not blocked; the later day on a tie). Lower and HYROX Quality
+ * sessions look for a day that doesn't follow a hard run (doubles count as hard), taking an
+ * aerobic day's place if needed (the aerobic session then moves on); only if there is none do they
+ * take the nearest free day. A session with nowhere to go is dropped.
  */
-export function moveOffDoubles(template: HxSlot[], doubles: readonly boolean[], blocked: readonly boolean[] = []): HxSlot[] {
+export function moveOffDoubles(template: HxSlot[], doubles: readonly boolean[], blocked: readonly boolean[] = [], hard: readonly boolean[] = doubles): HxSlot[] {
   const out = template.slice();
-  for (let i = 0; i < 7; i++) {
-    if (!doubles[i] || out[i] === "off") continue;
-    const slot = out[i];
-    out[i] = "off";
-    const free = (j: number) => j >= 0 && j < 7 && !doubles[j] && !blocked[j] && out[j] === "off";
-    for (let d = 1; d < 7; d++) {
-      const j = free(i + d) ? i + d : free(i - d) ? i - d : -1;
-      if (j >= 0) { out[j] = slot; break; }
+  const queue: { slot: HxSlot; from: number }[] = [];
+  for (let i = 0; i < 7; i++) if (doubles[i] && out[i] !== "off") { queue.push({ slot: out[i], from: i }); out[i] = "off"; }
+  queue.sort((x, y) => Number(FRESH.includes(y.slot)) - Number(FRESH.includes(x.slot)));
+  const open = (j: number) => j >= 0 && j < 7 && !doubles[j] && !blocked[j];
+  const rested = (j: number) => !hard[(j + 6) % 7] && !doubles[(j + 6) % 7];
+  const near = (i: number) => [1, 2, 3, 4, 5, 6].flatMap((d) => [i + d, i - d]).filter(open);
+  while (queue.length) {
+    const { slot, from } = queue.shift()!;
+    const days = near(from);
+    let j = -1;
+    if (FRESH.includes(slot)) {
+      j = days.find((k) => rested(k) && (out[k] === "off" || out[k] === "aerobic")) ?? -1;
+      if (j >= 0 && out[j] === "aerobic") queue.push({ slot: "aerobic", from: j });
     }
+    if (j < 0) j = days.find((k) => out[k] === "off") ?? -1;
+    if (j >= 0) out[j] = slot;
   }
   return out;
 }
 
-/** `doubles[week][day]`: the run plan has a double threshold day there (Norwegian Method). */
-export function buildHyrox(h: HyroxSettings, cal: Calendar, lib: LibSession[] = BUILTIN_SESSIONS, doubles?: readonly (readonly boolean[])[]): HxPlan {
-  const weeks: HxWeek[] = [];
+/** `runDays[week][day]`: that day in the run plan. Station sessions move off double threshold days. */
+export function buildHyrox(h: HyroxSettings, cal: Calendar, lib: LibSession[] = BUILTIN_SESSIONS, runDays?: readonly (readonly RunDay[])[]): HxPlan {  const weeks: HxWeek[] = [];
   for (const cw of cal.weeks) {
     const spec = weekSpec(cw, h);
     const weak = weakFor(h, cw.period);
@@ -692,7 +705,8 @@ export function buildHyrox(h: HyroxSettings, cal: Calendar, lib: LibSession[] = 
     else if (spec.kind === "vacation") days = Array.from({ length: 7 }, (): HxDay => ({ type: "off", title: TITLES.off, blocks: [], min: 0, vol: {} }));
     else {
       const blocked = cw.off.map((off, i) => off || (i === 0 && cw.afterRace));
-      const tmpl = doubles?.[cw.i] ? moveOffDoubles(h.template, doubles[cw.i], blocked) : h.template;
+      const run = runDays?.[cw.i];
+      const tmpl = run ? moveOffDoubles(h.template, run.map((r) => r === "double"), blocked, run.map((r) => r !== "easy")) : h.template;
       days = tmpl.map((slot0, i) => {
         const slot: HxSlot = cw.off[i] ? "off" : slot0;
         const before = { ...c.vol };
