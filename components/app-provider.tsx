@@ -1,19 +1,20 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { User } from "@supabase/supabase-js";
 import { toast } from "sonner";
 import { buildModel, type Model } from "@/lib/vdot";
 import { buildPlan, type Plan } from "@/lib/plan";
 import { buildHyrox, type HxPlan, type HyroxSettings } from "@/lib/hyrox";
 import { buildCalendar, type Calendar } from "@/lib/calendar";
-import { loadLocal, normalizeSettings, saveLocal, type Settings } from "@/lib/settings";
-import { fetchSessions, supabase } from "@/lib/supabase";
+import { normalizeSettings, STORAGE_KEY, type Settings } from "@/lib/settings";
+import { accountError, fetchSessions, latestSavedPlan, loadAccountSettings, saveAccountSettings, supabase } from "@/lib/supabase";
 import { BUILTIN_SESSIONS, type LibSession } from "@/lib/session-library";
 import { COROS_SERVER, corosConnected, corosHandleRedirect, directCoros, type CorosClient } from "@/lib/coros";
 
 export type Screen = "dashboard" | "builder" | "hyrox" | "paces";
 type Entry = "guest" | "account" | null;
+export type SaveState = "guest" | "loading" | "saving" | "saved" | "error";
 
 interface AppState {
   ready: boolean;
@@ -38,8 +39,9 @@ interface AppState {
   recovering: boolean;            // opened a password-reset link
   finishRecovery: () => void;
   signOut: () => Promise<void>;
-  currentPlan: { id: string; name: string } | null;
-  setCurrentPlan: (p: { id: string; name: string } | null) => void;
+  /** Guests: nothing is saved. Signed in: settings save to the account automatically. */
+  saveState: SaveState;
+  saveError: string | null;
   coros: { client: CorosClient | null; source: "direct" | "connector" | null; server: string };
   refreshCoros: () => void;
   sentVersion: number;
@@ -72,7 +74,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [entry, setEntryState] = useState<Entry>(null);
   const [user, setUser] = useState<User | null>(null);
   const [recovering, setRecovering] = useState(false);
-  const [currentPlan, setCurrentPlan] = useState<{ id: string; name: string } | null>(null);
+  const [saveState, setSaveState] = useState<SaveState>("guest");
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [syncedUser, setSyncedUser] = useState<string | null>(null); // account whose settings are loaded
+  const lastSaved = useRef<string>("");
+  const legacy = useRef<Settings | null>(null);                          // settings an older version kept in this browser
+  const current = useRef<Settings>(settings);
+  current.current = settings;
   const [coros, setCoros] = useState<AppState["coros"]>({ client: null, source: null, server: COROS_SERVER });
   const [sentVersion, setSentVersion] = useState(0);
   const [library, setLibrary] = useState<LibSession[]>(BUILTIN_SESSIONS);
@@ -95,7 +103,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Opened from a password-reset email (we add ?reset=1 to its return address).
     if (new URLSearchParams(location.search).get("reset") === "1" || /type=recovery/.test(location.hash)) setRecovering(true);
-    setSettings(loadLocal());
+    // Workouts are never kept in the browser: guests start fresh, accounts load from the database.
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) { legacy.current = normalizeSettings(JSON.parse(raw)); localStorage.removeItem(STORAGE_KEY); }
+    } catch { /* ignore */ }
     setScreenState(screenFromHash());
     if (/^#(connections|intervals)$/.test(location.hash)) setTimeout(() => document.getElementById("connections")?.scrollIntoView(), 300);
     setEntryState(readEntry());
@@ -135,12 +147,49 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const update = useCallback((patch: Partial<Settings> | ((s: Settings) => Partial<Settings>)) => {
-    setSettings((s) => { const n = { ...s, ...(typeof patch === "function" ? patch(s) : patch) }; saveLocal(n); return n; });
+    setSettings((s) => ({ ...s, ...(typeof patch === "function" ? patch(s) : patch) }));
   }, []);
   const updateHyrox = useCallback((patch: Partial<HyroxSettings>) => {
-    setSettings((s) => { const n = { ...s, hyrox: { ...s.hyrox, ...patch } }; saveLocal(n); return n; });
+    setSettings((s) => ({ ...s, hyrox: { ...s.hyrox, ...patch } }));
   }, []);
-  const replaceSettings = useCallback((s: Settings) => { const n = normalizeSettings(s); saveLocal(n); setSettings(n); }, []);
+  const replaceSettings = useCallback((s: Settings) => { setSettings(normalizeSettings(s)); }, []);
+
+  // Signed in: load this account's settings (or start it from an older saved plan), then keep them saved.
+  useEffect(() => {
+    if (!user) { setSyncedUser(null); setSaveState("guest"); setSaveError(null); lastSaved.current = ""; setSettings(normalizeSettings({})); return; }
+    let cancelled = false;
+    setSaveState("loading");
+    (async () => {
+      try {
+        let s = await loadAccountSettings();
+        if (!s) {
+          s = (await latestSavedPlan()) ?? legacy.current ?? current.current;
+          s = normalizeSettings(s);
+          await saveAccountSettings(user.id, s);
+        }
+        if (cancelled) return;
+        const n = normalizeSettings(s);
+        lastSaved.current = JSON.stringify(n);
+        setSettings(n); setSyncedUser(user.id); setSaveState("saved"); setSaveError(null);
+      } catch (e) {
+        if (cancelled) return;
+        setSaveState("error"); setSaveError(accountError(e));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!user || syncedUser !== user.id) return;
+    const json = JSON.stringify(settings);
+    if (json === lastSaved.current) return;
+    setSaveState("saving");
+    const t = setTimeout(async () => {
+      try { await saveAccountSettings(user.id, settings); lastSaved.current = json; setSaveState("saved"); setSaveError(null); }
+      catch (e) { setSaveState("error"); setSaveError(accountError(e)); }
+    }, 800);
+    return () => clearTimeout(t);
+  }, [settings, syncedUser, user]);
 
   const setScreen = useCallback((s: Screen) => {
     setScreenState(s);
@@ -164,9 +213,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     finishRecovery: () => { setRecovering(false); history.replaceState(null, "", location.pathname + "#paces"); setScreenState("paces"); },
     signOut: async () => {
       await supabase()?.auth.signOut();
-      setUser(null); setCurrentPlan(null); writeEntry(null); setEntryState(null);
+      setUser(null); writeEntry(null); setEntryState(null);
     },
-    currentPlan, setCurrentPlan,
+    saveState, saveError,
     coros, refreshCoros,
     sentVersion, bumpSent: () => setSentVersion((v) => v + 1),
   };

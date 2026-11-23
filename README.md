@@ -20,7 +20,7 @@ and shadcn/ui. Design rules are in [DESIGN.md](DESIGN.md).
   - Weak stations per period get more volume, a phase-matched extra block and muscle-specific accessory work.
   - Workouts shown as lettered blocks with steps and cues. Copy, CSV and intervals.icu (as strength workouts).
 - **Profile**: PB and paces (VDOT), the shared **Season** (start and end, races, time off), and **Connections** (COROS and intervals.icu).
-- **My plans**: save, open and delete named plans on your profile (Supabase); both plans and the season save together.
+- **Accounts**: signed-in users' settings (profile, season, both plans) save to their account automatically and are private to them (Supabase, row-level security). Guests' plans aren't saved.
 
 ## Develop
 

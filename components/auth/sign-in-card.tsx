@@ -143,7 +143,7 @@ export function SignInCard() {
           <p className="text-muted-foreground">Accounts aren&apos;t set up on this site yet. You can still use every feature as a guest.</p>
         )}
         <Button variant="outline" className="w-full" onClick={enterAsGuest}>Continue as guest</Button>
-        <p className="font-extralight text-muted-foreground">As a guest, your settings stay in this browser only.</p>
+        <p className="font-extralight text-muted-foreground">As a guest, nothing is saved: your plan resets when you leave. Sign in to keep it on your account.</p>
       </CardContent>
     </Card>
   );

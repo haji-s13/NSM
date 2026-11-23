@@ -1,5 +1,6 @@
 "use client";
 
+import { SaveStatus } from "@/components/plans/save-status";
 import { useState } from "react";
 import { Download, Watch } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -9,7 +10,6 @@ import {
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useApp } from "@/components/app-provider";
-import { MyPlans } from "@/components/plans/my-plans";
 import { MethodSwitch } from "./method-switch";
 import { BlockHeading, PeriodHeading } from "@/components/plans/block-heading";
 import { corosSent, dayItems, itemKey } from "@/lib/coros";
@@ -59,11 +59,11 @@ export function BuilderScreen() {
             ? "two double threshold days (a controlled morning session and a slightly faster afternoon one) and an X session of short, fast reps, one long run."
             : "three sub-threshold sessions, one long run."} Everything else is easy. Set dates, races and time off on Profile.
         </p>
+        <SaveStatus />
       </section>
 
       <MethodSwitch />
 
-      <MyPlans />
       <PlanSettings />
 
       <WeekTemplateCard />

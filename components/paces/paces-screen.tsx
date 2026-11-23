@@ -1,5 +1,6 @@
 "use client";
 
+import { SaveStatus } from "@/components/plans/save-status";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useApp } from "@/components/app-provider";
 import { PbForm } from "./pb-form";
@@ -20,6 +21,7 @@ export function PacesScreen() {
         <p className="max-w-[65ch] text-muted-foreground">
           {name ? `${name}: your` : "Your"} PB, your season and your connections. The run plan and the HYROX plan are both built from what you set here.
         </p>
+        <SaveStatus />
       </section>
 
       <Card className="gap-4 py-6">

@@ -81,3 +81,31 @@ export function sessionError(error: unknown): string {
   if (/JWT|expired|not authenticated/i.test(m)) return "Your sign-in has expired. Sign out and sign in again.";
   return m || "Something went wrong with the session library.";
 }
+
+/* ---------- Account settings: one private row per user (see supabase/user_settings.sql) ---------- */
+
+export async function loadAccountSettings(): Promise<Settings | null> {
+  // Row-level security returns only the signed-in user's row.
+  const { data, error } = await supabase()!.from("user_settings").select("settings").limit(1);
+  if (error) throw error;
+  return (data as { settings: Settings }[])[0]?.settings ?? null;
+}
+export async function saveAccountSettings(userId: string, settings: Settings): Promise<void> {
+  const { error } = await supabase()!.from("user_settings")
+    .upsert({ user_id: userId, settings, updated_at: new Date().toISOString() }, { onConflict: "user_id" });
+  if (error) throw error;
+}
+/** The newest plan saved with the old "My plans" card, to carry over into the account. */
+export async function latestSavedPlan(): Promise<Settings | null> {
+  const { data, error } = await supabase()!.from("plans").select("settings").order("updated_at", { ascending: false }).limit(1);
+  if (error) return null;
+  return (data as { settings: Settings }[])[0]?.settings ?? null;
+}
+export function accountError(error: unknown): string {
+  const m = String((error as { message?: string })?.message || "");
+  if (/user_settings.* does not exist|could not find the table/i.test(m)) return "Account storage isn't set up yet. Run supabase/user_settings.sql in Supabase.";
+  if (/permission denied/i.test(m)) return "Your account can't save yet. Run the grant line in supabase/user_settings.sql.";
+  if (/JWT|expired|not authenticated/i.test(m)) return "Your sign-in has expired. Sign out and sign in again.";
+  if (/fetch|network/i.test(m)) return "Couldn't reach your account. Changes will save when you're back online.";
+  return m || "Couldn't save to your account.";
+}

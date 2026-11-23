@@ -118,19 +118,8 @@ export function normalizeSettings(raw: unknown): Settings {
   return s;
 }
 
+/** Where an older version kept settings in the browser; read once to carry them into an account, then removed. */
 export const STORAGE_KEY = "nsm-planner-v1";
-
-export function loadLocal(): Settings {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return normalizeSettings(JSON.parse(raw));
-  } catch { /* storage unavailable */ }
-  return defaultSettings();
-}
-
-export function saveLocal(s: Settings) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); } catch { /* ignore */ }
-}
 
 export function templateWarnings(t: SessionType[]): string[] {
   const warns: string[] = [];
