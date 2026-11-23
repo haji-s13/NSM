@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Flag, Palmtree } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useApp } from "@/components/app-provider";
+import { TestPrompt } from "@/components/plans/test-prompt";
 import { DayCell } from "@/components/builder/day-cell";
 import { HyroxDayRow } from "@/components/hyrox/hyrox-day-row";
 import { useHxSend } from "@/components/hyrox/use-hx-send";
@@ -70,6 +71,7 @@ export function DashboardScreen() {
 
   return (
     <div className="flex flex-col gap-8">
+      <TestPrompt />
       <section className="flex flex-col gap-2">
         <p className="text-meta uppercase text-signal">
           {atSel ? `Week ${atSel.w + 1} · Period ${calendar.weeks[atSel.w].period + 1} · Block ${calendar.weeks[atSel.w].blockInPeriod + 1}` : selDate < start ? "Before your plan starts" : "After your plan ends"}

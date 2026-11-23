@@ -7,7 +7,8 @@ import { RACES } from "@/lib/vdot";
 
 /** Predicted race times from the VDOT. */
 export function RaceTable() {
-  const { model, settings } = useApp();
+  const { currentModel, model: pbModel, settings } = useApp();
+  const model = currentModel ?? pbModel;
   if (!model) return null;
   return (
     <Table>
