@@ -96,8 +96,9 @@ export const WEAK_FACTOR = { moderate: 1.25, high: 1.5 } as const;
 
 /* ---------- Plan shapes ---------- */
 
-/** `weak`: a top-up block for a weak station. `acc`: accessory gym work. `boost`: weak stations whose sets or rounds this block scaled up. */
-export interface HxBlock { label: string; text: string; min: number; weak?: Station; acc?: Station; boost?: Station[] }
+/** `weak`: a top-up block for a weak station. `acc`: accessory gym work. `boost`: weak stations whose sets or rounds this block scaled up.
+ *  `was`: for a boosted block, the text it would have with no weak stations (to show what changed). */
+export interface HxBlock { label: string; text: string; min: number; weak?: Station; acc?: Station; boost?: Station[]; was?: string }
 export interface HxDay {
   type: HxDayType;
   title: string;
@@ -426,9 +427,9 @@ function lower(c: Ctx): HxBlock[] {
     return [A, B, C];
   }
   switch (c.spec.w % 3) {
-    case 0: c.add("lunges", 20 * lunge); B = { label: "B", min: 12, text: `Bulgarian split squats 3 × 8 per leg @ lunge weight or heavier, then walking lunges ${lunge} × 20 m @ ${c.w(d.lunges)}` }; break;
-    case 1: c.add("lunges", 20 * lunge); B = { label: "B", min: 12, text: `Reverse lunges 3 × 10 per leg, then DB goblet walking lunges ${lunge} × 20 m @ ${c.w(d.lunges)}, rest 1:1` }; break;
-    default: c.add("lunges", 25 * lunge); B = { label: "B", min: 14, text: `Step-ups 3 × 8 per leg, then walking lunges ${lunge} × 25 m @ ${c.w(d.lunges + 5)}. Expect the legs to burn.` };
+    case 0: c.add("lunges", 20 * lunge); B = { label: "B", min: 12, text: `Bulgarian split squats ${c.weakN(3, "lunges")} × 8 per leg @ lunge weight or heavier, then walking lunges ${lunge} × 20 m @ ${c.w(d.lunges)}` }; break;
+    case 1: c.add("lunges", 20 * lunge); B = { label: "B", min: 12, text: `Reverse lunges ${c.weakN(3, "lunges")} × 10 per leg, then DB goblet walking lunges ${lunge} × 20 m @ ${c.w(d.lunges)}, rest 1:1` }; break;
+    default: c.add("lunges", 25 * lunge); B = { label: "B", min: 14, text: `Step-ups ${c.weakN(3, "lunges")} × 8 per leg, then walking lunges ${lunge} × 25 m @ ${c.w(d.lunges + 5)}. Expect the legs to burn.` };
   }
   switch ((c.spec.w + 1) % 3) {
     case 0: c.add("wb", wbSets * 20); C = { label: "C", min: wbSets * 1.5, text: `Wall balls ${wbSets} × 20 unbroken @ ${c.w(d.wb)}, 45 s rest` }; break;
@@ -789,6 +790,19 @@ export function buildHyrox(h: HyroxSettings, cal: Calendar, lib: LibSession[] = 
         for (const st of c.boosted) weekBoosted.add(st);
         return day;
       });
+      // What each boosted block would say with no weak stations: the same days built on a separate
+      // context (its volume and tags are thrown away), matched by day and block label.
+      if (weekBoosted.size) {
+        const base = new Ctx(h, spec, [], lib);
+        tmpl.forEach((slot0, i) => {
+          const plain = dayFor(base, cw.off[i] ? "off" : slot0).blocks;
+          for (const b of days[i].blocks) {
+            if (!b.boost?.length) continue;
+            const m = plain.find((x) => x.label === b.label);
+            if (m && m.text !== b.text) b.was = m.text;
+          }
+        });
+      }
       // A top-up block (at most one) for each weak station no session this week scaled up.
       // Absorb weeks get the light version. Not in benchmark weeks.
       if (spec.kind !== "bench" && spec.kind !== "test") {
@@ -851,6 +865,20 @@ function diff(a: Partial<Record<Station, number>>, b: Partial<Record<Station, nu
 
 export const fmtVol = (st: Station, v: number) => `${Math.round(v).toLocaleString()}${STATION[st].unit === "reps" ? " reps" : " m"}`;
 
+const NUM_RX = /\d+(?:\.\d+)?/g;
+
+/** Splits text into alternating [text, number, text, number, …, text] parts. */
+export function numParts(s: string): string[] {
+  return s.split(/(\d+(?:\.\d+)?)/);
+}
+
+/** The numbers a weakness changed, as [was, now] pairs; null if the two texts don't line up number for number. */
+export function numChanges(was: string, now: string): [string, string][] | null {
+  const a = was.match(NUM_RX) ?? [], b = now.match(NUM_RX) ?? [];
+  if (a.length !== b.length) return null;
+  return a.flatMap((x, i): [string, string][] => (x === b[i] ? [] : [[x, b[i]]]));
+}
+
 /** Plain text for one day (Copy button, intervals.icu description). */
 export function hxDayText(wk: HxWeek, d: HxDay): string {
   const lines = [`${d.title} – HYROX week ${wk.n} (${wk.phase})`];
@@ -861,7 +889,8 @@ export function hxDayText(wk: HxWeek, d: HxDay): string {
     if (!b.boost?.length) { lines.push(t); continue; }
     const [first, ...rest] = t.split("\n");
     // "B: …" can have an empty heading (the steps follow), so put the tag after the label, not after the heading.
-    const tag = `[weak station +${pct}%]`;
+    const ch = b.was ? numChanges(b.was, b.text) : null;
+    const tag = `[weak station +${pct}%]${ch?.length ? ` (${ch.map(([x, y]) => `${x} → ${y}`).join(", ")})` : ""}`;
     const m = /^([^:]+):\s?(.*)$/.exec(first);
     lines.push([m ? `${m[1]}: ${tag}${m[2] ? ` ${m[2]}` : ""}` : `${tag} ${first}`, ...rest].join("\n"));
   }
