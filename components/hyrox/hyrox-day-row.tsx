@@ -60,7 +60,7 @@ export function HyroxDayRow({ wk, i, onIcu, busy, hideRun = false }: { wk: HxWee
               <p key={k} className="font-extralight text-muted-foreground">Warm-up · {b.text}</p>
             ))}
             <ol className="flex flex-col divide-y divide-border overflow-hidden rounded-md border bg-card">
-              {d.blocks.filter((b) => b.label !== "Warm-up").map((b, k) => <BlockView key={k} b={b} pct={settings.hyrox.emphasis === "high" ? 50 : 25} />)}
+              {d.blocks.filter((b) => b.label !== "Warm-up").map((b, k) => <BlockView key={k} b={b} pct={wk.weakPct ?? 25} />)}
             </ol>
             <p className="num text-muted-foreground">{d.type === "race" ? "Race day" : `~${Math.round(d.min)} min`}</p>
             {runLine && <p className="text-meta uppercase text-muted-foreground">Run plan <span className="font-extralight normal-case tracking-normal text-foreground">{runLine}</span></p>}
