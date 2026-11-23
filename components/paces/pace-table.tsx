@@ -7,7 +7,8 @@ const rep = (r: Range, km: number, label: string) => `${label} ${fmtTime(r.lo * 
 
 /** Training paces as ranges, as a list that reads well on a phone. */
 export function PaceTable() {
-  const { model, settings } = useApp();
+  const { currentModel, model: pbModel, settings } = useApp();
+  const model = currentModel ?? pbModel;
   if (!model) return null;
   const p = model.paces;
   const u = settings.units;

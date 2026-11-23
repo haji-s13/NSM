@@ -8,7 +8,7 @@ export function mainLine(d: Session, u: Units, p: Paces): string {
   if (d.type === "easy") return `${dist(d.km, u)} easy @ ${rangeOf(p.easy, u)}${d.strides ? `, then ${STRIDES}` : ""}`;
   if (d.type === "longrun") return `${dist(d.km, u)} easy @ ${rangeOf(p.easy, u)}`;
   if (d.mainText) return d.mainText;
-  if (d.type === "race") return `${d.title} @ current PB pace ${pace(d.racePace!, u)} (${fmtTime(d.raceTime!)})`;
+  if (d.type === "race") return `${d.title} @ ${d.title === "5k test" ? "current 5k pace" : "predicted pace"} ${pace(d.racePace!, u)} (${fmtTime(d.raceTime!)})`;
   const r = d.reps!;
   if (d.type === "hills") {
     return `${r.n} × 400 m @ ${rangeOf(r.pace, u)} (${fmtTime(r.pace.lo * 0.4)}–${fmtTime(r.pace.hi * 0.4)}), 30s rest`;

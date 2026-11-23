@@ -2,6 +2,7 @@ import { nextMonday, type Units } from "./format";
 import { defaultHyrox, normalizeHyrox, type HyroxSettings } from "./hyrox";
 import { addDays, defaultEnd, mondayOf, newId, type Race, type Vacation } from "./calendar";
 import { isoDate, parseDate } from "./format";
+import { buildModel } from "./vdot";
 
 export type SessionType = "rest" | "easy" | "short" | "medium" | "long" | "hills" | "longrun";
 export type RepFormat = "distance" | "time" | "mixed";
@@ -42,6 +43,8 @@ export interface Settings {
   /** Bakken: below this weekly volume (display units) only the first double day stays double. */
   lowMileage: number;
   icuAthlete?: string;
+  /** 5k test results, each recorded at the end of `period` (0-based); they set the paces of later periods. */
+  paceTests?: { period: number; time: string }[];
   /** HYROX station program. Shares startDate with the run plan and saves with it. */
   hyrox: HyroxSettings;
 }
@@ -119,7 +122,21 @@ export function normalizeSettings(raw: unknown): Settings {
     if (s.finalWeek === "race") s.finalWeek = "test";
   }
   if (!Array.isArray(s.vacations)) s.vacations = [];
+  if (s.paceTests !== undefined) {
+    s.paceTests = Array.isArray(s.paceTests)
+      ? s.paceTests.filter((t) => t && typeof t.period === "number" && Number.isFinite(t.period) && typeof t.time === "string")
+      : [];
+  }
   return s;
+}
+
+/** The latest 5k test finished before period `p` starts, or null. */
+export function testForPeriod(s: Settings, p: number): { period: number; time: string } | null {
+  let best: { period: number; time: string } | null = null;
+  for (const t of s.paceTests || []) {
+    if (t.period < p && buildModel("5000", t.time, 0) !== null && (!best || t.period > best.period)) best = t;
+  }
+  return best;
 }
 
 /** Where an older version kept settings in the browser; read once to carry them into an account, then removed. */
