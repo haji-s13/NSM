@@ -836,7 +836,10 @@ export function hxDayText(wk: HxWeek, d: HxDay): string {
     const t = prettyText(b.label, b.text);
     if (!b.boost?.length) { lines.push(t); continue; }
     const [first, ...rest] = t.split("\n");
-    lines.push([`${first} (weak station +${pct}%)`, ...rest].join("\n"));
+    // "B: …" can have an empty heading (the steps follow), so put the tag after the label, not after the heading.
+    const tag = `[weak station +${pct}%]`;
+    const m = /^([^:]+):\s?(.*)$/.exec(first);
+    lines.push([m ? `${m[1]}: ${tag}${m[2] ? ` ${m[2]}` : ""}` : `${tag} ${first}`, ...rest].join("\n"));
   }
   if (d.min && d.type !== "race") lines.push(`Est. time: ~${Math.round(d.min)} min`);
   return lines.join("\n");
