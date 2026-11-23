@@ -18,7 +18,7 @@ You are the lead. Four workers live in `.claude/agents/`:
 | Agent | Model | Edits? | Use it to |
 | --- | --- | --- | --- |
 | explorer | Haiku | No | Find code and answer "where/what" questions, in parallel |
-| implementer | Sonnet | Yes | Make one scoped change and check it builds |
+| implementer | Opus 5.5 | Yes | Make one scoped change and check it builds |
 | tester | Sonnet | `tests/` only | Write and run tests for the new behaviour |
 | reviewer | Opus | No | Review the diff for bugs, privacy and security problems |
 
