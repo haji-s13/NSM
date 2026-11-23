@@ -2,7 +2,7 @@
 name: implementer
 description: Makes one well-scoped code change. Give it the files to touch, what to change, and the test command; it edits the code, runs the tests and reports the diff summary and results. Use one per independent change; run several in parallel only when they touch different files.
 tools: Read, Grep, Glob, Edit, Write, Bash
-model: sonnet
+model: claude-opus-5-5
 ---
 You implement exactly the change you are given, nothing more.
 

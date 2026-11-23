@@ -53,7 +53,7 @@ Research rules (also apply when researching without the subagent):
 ## Swarm workflow
 
 Four more subagents live in `.claude/agents/`: `explorer` (Haiku, read-only), `implementer`
-(Sonnet), `tester` (Sonnet) and `reviewer` (Opus, read-only). How they're set up and tuned:
+(Opus 5.5), `tester` (Sonnet) and `reviewer` (Opus, read-only). How they're set up and tuned:
 [.claude/SWARM.md](.claude/SWARM.md).
 
 You are the lead. For any task bigger than a small single-file fix, delegate:

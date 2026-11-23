@@ -5,7 +5,7 @@ A lead Claude (your normal Claude Code session) plus four worker subagents (this
 | Agent | Model | Can edit? | Job |
 | --- | --- | --- | --- |
 | explorer | Haiku | No | Find code and answer "where/what" questions, cheaply and in parallel |
-| implementer | Sonnet | Yes | Make one scoped change and run the tests |
+| implementer | Opus 5.5 | Yes | Make one scoped change and run the tests |
 | tester | Sonnet | Tests only | Write and run tests for new behaviour |
 | reviewer | Opus | No | Review the diff for bugs and security issues |
 
