@@ -165,3 +165,17 @@ Code: `lib/plan.ts:300-366` (`bakkenSessions`), `lib/settings.ts:92` (default te
 4. Marius Bakken, "Kenyan Training: a Practical Guide" (zones: zone 3 = LT 2.0–3.0 mmol), mariusbakken.com, c. 2000–2004. https://www.mariusbakken.com/training-corner/kenyan-training/kenyan-training-a-practical-guide.html
 5. Casado, Bakken et al., "Does Lactate-Guided Threshold Interval Training within a High-Volume Low-Intensity Approach Represent the 'Next Step' in the Evolution of Distance Running Training?", *IJERPH*, 2023 (cited in [3]; not read in full). https://www.researchgate.net/publication/368706323
 6. Kjøsen Talsnes et al., NTNU, *Frontiers in Physiology*, 2024: 6 × 10 min vs 2 × (3 × 10 min), as summarised in [3]; not read in full.
+
+## Changes made (2026-11-23)
+
+Items 1–7 under "Differs" are now in the code:
+
+1. Evening formats are 1 km/60 s, 400 m/30 s, 1 min/30 s and 45 s/15 s. No evening rep is longer than 1 km (`PM_FORMATS`, `lib/plan.ts`).
+2. 45/15 moved from the X session to evening threshold. A new X option, 10 × 200 m at mile–1500 m pace (`p.speed`), took its place.
+3. Flat X reps (300s, 400s) use a new 3k–5k band (`p.fast`, `lib/vdot.ts`).
+4. Morning formats are 6, 8 and 10 min, and 2000 m and 3000 m reps. No more 5 min reps.
+5. Norwegian Method long run capped at 18 km (`BAKKEN_LONG_RUN_MAX_KM`).
+6. Lighter weeks are a separate setting for the Norwegian Method (`bakkenDeloads`), off by default (flat weeks).
+7. Race weeks get R1 (4 × 1000 m + 4 × 300 m at 3k–5k pace, 4 days out) and R2 (3 × 2 km threshold, 2 days out). Everything else in the week is easy. The second set exports to intervals.icu and COROS (`Session.reps2`).
+
+Not done yet: 8 (heart-rate cues in workout text) and 9 (volume ramp; no source rule).
