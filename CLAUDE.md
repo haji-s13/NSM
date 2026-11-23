@@ -49,3 +49,22 @@ Research rules (also apply when researching without the subagent):
 - TypeScript, functional React components, shadcn/ui primitives from `components/ui/`.
 - Tabular numerals on every pace, time and distance.
 - Keep plan logic in `lib/` pure and UI-free.
+
+## Swarm workflow
+
+Four more subagents live in `.claude/agents/`: `explorer` (Haiku, read-only), `implementer`
+(Sonnet), `tester` (Sonnet) and `reviewer` (Opus, read-only). How they're set up and tuned:
+[.claude/SWARM.md](.claude/SWARM.md).
+
+You are the lead. For any task bigger than a small single-file fix, delegate:
+
+1. **Explore:** send `explorer` subagents in parallel, one per area of the code you need to understand. If the change depends on outside facts, send `researcher` too (see above).
+2. **Plan:** write a short plan yourself and split it into independent changes.
+3. **Build:** give each change to an `implementer` with the exact files, the goal and the checks (`npm run typecheck`, `npm run build`). Run implementers in parallel only when they touch different files.
+4. **Test:** there's no test framework yet, so only use `tester` when the task asks for tests. Adding one (for example Vitest) is a dependency change: confirm it with the user first.
+5. **Review:** ask `reviewer` to check the full diff. Verify each finding yourself before fixing it.
+6. **Finish:** summarise what changed and the final typecheck and build results.
+
+Subagents do not see this conversation, so every task you hand off must include the file paths,
+the goal, constraints (DESIGN.md for UI work, the conventions above) and the check commands.
+Do small tasks yourself; delegating has overhead.
