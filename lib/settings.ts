@@ -1,7 +1,8 @@
 import { nextMonday, type Units } from "./format";
 import { defaultHyrox, normalizeHyrox, type HyroxSettings } from "./hyrox";
 import { addDays, defaultEnd, mondayOf, newId, type Race, type Vacation } from "./calendar";
-import { isoDate, parseDate, parseTime } from "./format";
+import { isoDate, parseDate } from "./format";
+import { buildModel } from "./vdot";
 
 export type SessionType = "rest" | "easy" | "short" | "medium" | "long" | "hills" | "longrun";
 export type RepFormat = "distance" | "time" | "mixed";
@@ -129,7 +130,7 @@ export function normalizeSettings(raw: unknown): Settings {
 export function testForPeriod(s: Settings, p: number): { period: number; time: string } | null {
   let best: { period: number; time: string } | null = null;
   for (const t of s.paceTests || []) {
-    if (t.period < p && !Number.isNaN(parseTime(t.time)) && (!best || t.period > best.period)) best = t;
+    if (t.period < p && buildModel("5000", t.time, 0) !== null && (!best || t.period > best.period)) best = t;
   }
   return best;
 }

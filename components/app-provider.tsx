@@ -4,11 +4,10 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { User } from "@supabase/supabase-js";
 import { toast } from "sonner";
 import { buildModel, type Model } from "@/lib/vdot";
-import { buildPlan, type Plan } from "@/lib/plan";
+import { buildPlan, type Plan, type Week } from "@/lib/plan";
 import { buildHyrox, type HxPlan, type HyroxSettings } from "@/lib/hyrox";
 import { buildCalendar, type Calendar } from "@/lib/calendar";
 import { normalizeSettings, STORAGE_KEY, testForPeriod, type Settings } from "@/lib/settings";
-import { parseTime } from "@/lib/format";
 import { accountError, fetchSessions, latestSavedPlan, loadAccountSettings, saveAccountSettings, supabase } from "@/lib/supabase";
 import { BUILTIN_SESSIONS, type LibSession } from "@/lib/session-library";
 import { COROS_SERVER, corosConnected, corosHandleRedirect, directCoros, type CorosClient } from "@/lib/coros";
@@ -29,6 +28,8 @@ interface AppState {
   currentModel: Model | null;
   /** Finished periods whose 5k test week has started and has no time entered. */
   testsDue: number[];
+  /** Per period: its scheduled 5k test week, or null when the plan has none. */
+  testWeeks: (Week | null)[];
   plan: Plan | null;
   hyrox: HxPlan;
   calendar: Calendar;
@@ -218,24 +219,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [model, settings.paceTests, settings.paceAdjust, periodCount]);
   const plan = useMemo(() => (model ? buildPlan(settings, model, calendar, models) : null), [settings, model, calendar, models]);
+  const testWeeks = useMemo<(Week | null)[]>(
+    () => calendar.periods.map((p) => plan?.weeks.find((w) => w.period === p.i && w.testWeek) ?? null),
+    [calendar, plan],
+  );
   const { currentPeriod, testsDue } = useMemo(() => {
     const now = new Date(); now.setHours(12, 0, 0, 0);
     let cur = 0;
     calendar.periods.forEach((p, i) => { if (now >= calendar.weeks[p.weeks[0]].start) cur = i; });
     const due: number[] = [];
-    calendar.periods.forEach((p, i) => {
-      if (i >= calendar.periods.length - 1) return;
-      const lastWeek = calendar.weeks[p.weeks[p.weeks.length - 1]];
-      const has = (settings.paceTests || []).some((t) => t.period === i && !Number.isNaN(parseTime(t.time)));
-      if (now >= lastWeek.start && !has) due.push(i);
+    testWeeks.forEach((tw, i) => {
+      if (!tw) return;
+      const has = (settings.paceTests || []).some((t) => t.period === i && buildModel("5000", t.time, 0) !== null);
+      if (now >= tw.weekStart && !has) due.push(i);
     });
     return { currentPeriod: cur, testsDue: due };
-  }, [calendar, settings.paceTests]);
+  }, [calendar, settings.paceTests, testWeeks]);
   const currentModel = models[currentPeriod] ?? model;
   const hyrox = useMemo(() => buildHyrox(settings.hyrox, calendar, library), [settings.hyrox, calendar, library]);
 
   const value: AppState = {
-    ready, settings, update, replaceSettings, model, models, currentPeriod, currentModel, testsDue, plan, hyrox, calendar, library, librarySource, refreshLibrary, updateHyrox, screen, setScreen,
+    ready, settings, update, replaceSettings, model, models, currentPeriod, currentModel, testsDue, testWeeks, plan, hyrox, calendar, library, librarySource, refreshLibrary, updateHyrox, screen, setScreen,
     entry: user ? "account" : entry,
     enterAsGuest: () => { writeEntry("guest"); setEntryState("guest"); },
     goHome: () => { writeEntry(null); setEntryState(null); },

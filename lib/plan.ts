@@ -88,6 +88,8 @@ export interface Week {
   testWeek: boolean;
   /** The VDOT whose paces this week uses. */
   vdot: number;
+  /** The paces this week uses (from its period's model). */
+  paces: Paces;
 }
 
 export interface Plan {
@@ -280,7 +282,7 @@ export function buildPlan(s: Settings, m: Model, cal: Calendar, models?: (Model 
       totalKm: days.reduce((a, d) => a + dayKm(d), 0),
       totalSec: days.reduce((a, d) => a + d.sec + (d.pm?.sec || 0), 0),
       subtKm: days.reduce((a, d) => a + (d.repKm || 0) + (d.pm?.repKm || 0), 0),
-      tooLow, testWeek, vdot: pm.vdot,
+      tooLow, testWeek, vdot: pm.vdot, paces: p,
     });
   }
   return { weeks, startKm, peakKm: Math.max(...periods.map((p) => p.peakKm)), peakWeek, periods, blocks: cal.blocks };

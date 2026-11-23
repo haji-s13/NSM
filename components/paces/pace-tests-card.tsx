@@ -5,13 +5,13 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useApp } from "@/components/app-provider";
 import { addDays } from "@/lib/calendar";
-import { fmtShortDate, parseTime } from "@/lib/format";
+import { fmtShortDate } from "@/lib/format";
 import { buildModel } from "@/lib/vdot";
 import { cn } from "@/lib/utils";
 
 /** One 5k time trial per finished period; the next period's paces use it. */
 export function PaceTestsCard() {
-  const { settings, update, calendar, currentPeriod } = useApp();
+  const { settings, update, calendar, currentPeriod, testWeeks } = useApp();
   const periods = calendar.periods;
   const setTest = (period: number, time: string) =>
     update((cur) => {
@@ -38,7 +38,8 @@ export function PaceTestsCard() {
                 const entry = (settings.paceTests || []).find((t) => t.period === p.i);
                 const value = entry?.time ?? "";
                 const m = value.trim() ? buildModel("5000", value, settings.paceAdjust) : null;
-                const invalid = value.trim() !== "" && Number.isNaN(parseTime(value));
+                const invalid = value.trim() !== "" && buildModel("5000", value, 0) === null;
+                const scheduled = !!testWeeks[p.i];
                 const future = p.i >= currentPeriod;
                 return (
                   <li key={p.i} className={cn("grid gap-2 py-4 sm:grid-cols-[minmax(0,1fr)_10rem] sm:items-center sm:gap-x-8", future && !value && "text-muted-foreground")}>
@@ -48,6 +49,8 @@ export function PaceTestsCard() {
                       <p className="font-extralight text-muted-foreground">
                         Sets Period {p.i + 2} paces{m ? <> · <span className="num font-black text-signal">VDOT {m.vdot.toFixed(1)}</span></> : null}
                       </p>
+                      {!scheduled && <p className="font-extralight text-muted-foreground">No 5k test this period (race, taper or time off in week 12)</p>}
+                      {invalid && <p className="font-extralight text-destructive">Enter a 5k time like 19:45</p>}
                     </div>
                     <Input id={`pace-test-${p.i}`} className="num" type="text" inputMode="text" autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false}
                       enterKeyHint="done" value={value} placeholder="19:45" aria-invalid={invalid}

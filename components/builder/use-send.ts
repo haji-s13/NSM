@@ -15,7 +15,7 @@ export function useSend() {
 
   const copy = useCallback(async (wk: Week, i: number) => {
     if (!model) return;
-    const ok = await copyText(workoutText(wk, wk.days[i], settings.units, model.paces));
+    const ok = await copyText(workoutText(wk, wk.days[i], settings.units, wk.paces));
     if (ok) toast.success("Copied. Paste it into your Strava description.");
     else toast.error("Couldn't copy. Select the text and copy it manually.");
   }, [model, settings.units]);
@@ -24,7 +24,7 @@ export function useSend() {
     if (!model || !items.length) return;
     setBusy(key);
     try {
-      const n = await icuPush(settings.icuAthlete, items.flatMap(({ wk, i }) => icuEvents(wk, i, settings.units, model.paces)));
+      const n = await icuPush(settings.icuAthlete, items.flatMap(({ wk, i }) => icuEvents(wk, i, settings.units, wk.paces)));
       toast.success(`Sent ${n} workout${n === 1 ? "" : "s"} (${label}) to intervals.icu.`);
     } catch (e) {
       toast.error((e as Error).message);
@@ -42,7 +42,7 @@ export function useSend() {
       for (const it of items) {
         if (!inCorosWindow(it.date)) { skipped++; continue; }
         if (items.length > 1) toast.loading(`Sending ${sent + 1} of ${items.length} to COROS…`, { id });
-        await coros.client.callTool(coros.server, COROS_TOOL, { date: ymd(it.date), course: corosCourse(it.wk, it.pm ? it.wk.days[it.i].pm! : it.wk.days[it.i], settings.units, model.paces) });
+        await coros.client.callTool(coros.server, COROS_TOOL, { date: ymd(it.date), course: corosCourse(it.wk, it.pm ? it.wk.days[it.i].pm! : it.wk.days[it.i], settings.units, it.wk.paces) });
         markCorosSent(itemKey(it));
         sent++;
       }

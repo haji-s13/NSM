@@ -58,8 +58,8 @@ export function DayCell({ wk, i }: { wk: Week; i: number }) {
       ) : (
         <>
           <div className="flex min-w-0 flex-col gap-3 tabular-nums">
-            <SessionLines d={d} label={d.pm ? "AM" : undefined} />
-            {d.pm && <SessionLines d={d.pm} label="PM" />}
+            <SessionLines wk={wk} d={d} label={d.pm ? "AM" : undefined} />
+            {d.pm && <SessionLines wk={wk} d={d.pm} label="PM" />}
           </div>
           <DayActions wk={wk} i={i} />
         </>
@@ -69,7 +69,7 @@ export function DayCell({ wk, i }: { wk: Week; i: number }) {
 }
 
 /** Warm-up, main set, cool-down and totals for one session (a double day shows AM and PM). */
-function SessionLines({ d, label }: { d: Session; label?: string }) {
+function SessionLines({ wk, d, label }: { wk: Week; d: Session; label?: string }) {
   const { settings, model } = useApp();
   const u = settings.units;
   if (!model) return null;
@@ -77,7 +77,7 @@ function SessionLines({ d, label }: { d: Session; label?: string }) {
     <div className="flex min-w-0 flex-col gap-0">
       {label && <p className="text-meta uppercase text-muted-foreground">{label}</p>}
       {!!d.wu && <p className="font-extralight text-muted-foreground">Warm-up {dist(d.wu, u)} easy{d.type === "race" ? " + strides" : ""}</p>}
-      <p className="font-black break-words">{mainLine(d, u, model.paces)}</p>
+      <p className="font-black break-words">{mainLine(d, u, wk.paces)}</p>
       {!!d.cd && <p className="font-extralight text-muted-foreground">Cool-down {dist(d.cd, u)} easy</p>}
       <p className="num text-muted-foreground">{dist(d.km, u)} · ~{fmtDuration(d.sec)}</p>
     </div>
