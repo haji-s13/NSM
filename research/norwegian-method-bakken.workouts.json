@@ -1,0 +1,61 @@
+{
+  "$comment": "Norwegian Method (Marius Bakken) workout library. Rules, rationale and sources: norwegian-method-bakken.md. 'paceBand' maps to lib/vdot.ts bands and is an inference for runners without a lactate meter; lactate/HR targets are Bakken's.",
+  "version": 1,
+  "date": "2026-11-23",
+  "targets": {
+    "easy": { "lactate": "<1.0", "hrMaxPct": "<70" },
+    "threshold": { "lactate": "2.0-3.0", "golden": "2.3-3.0", "hrMaxPct": "80-87", "talkTest": "short sentences, no comfortable conversation" },
+    "thresholdAm": { "lactate": "2.0-3.0", "note": "float just below threshold; >3.0 by last rep = too hard" },
+    "thresholdPm": { "lactate": "~3.0", "note": "at or slightly above threshold; 15-20 s/km faster than AM" },
+    "x": { "lactate": "5-8" }
+  },
+  "rules": {
+    "doubleDaysPerWeek": 2,
+    "xSessionsPerWeek": 1,
+    "hoursBetweenAmPm": [6, 8],
+    "easyDayAfterThreshold": true,
+    "intervalsNotContinuous": true,
+    "repLengthRange": ["30s", "10min"],
+    "shortRepRecoverySec": [15, 30],
+    "amPmPaceGapSecPerKm": [15, 20],
+    "thresholdShareOfWeekPct": [23, 25],
+    "longRunMaxKm": 18,
+    "longRunMaxMin": 60,
+    "weeklyKm": { "minimum": 120, "best": [160, 180], "some": [170, 220] },
+    "periodization": "flat weeks; or 10-14 days on / 7 days easier",
+    "raceSeason": "mostly single threshold, occasional doubles; add track work gradually"
+  },
+  "workouts": [
+    { "id": "AM1", "slot": "am", "name": "6 × 2000 m", "reps": 6, "repM": 2000, "recSec": 60, "target": "thresholdAm", "paceBand": ["hm", "25k"], "source": [2, 3] },
+    { "id": "AM2", "slot": "am", "name": "4 × 10 min", "reps": 4, "repMin": 10, "recSec": 60, "target": "thresholdAm", "paceBand": ["25k", "30k"], "source": [2] },
+    { "id": "AM3", "slot": "am", "name": "5–6 × 6 min", "reps": [5, 6], "repMin": 6, "recSec": 60, "target": "thresholdAm", "paceBand": ["hm", "hm"], "source": [1] },
+    { "id": "AM4", "slot": "am", "name": "3–4 × 3000 m", "reps": [3, 4], "repM": 3000, "recSec": [60, 90], "target": "thresholdAm", "paceBand": ["25k", "30k"], "source": [3] },
+    { "id": "AM5", "slot": "am", "name": "3 × 10 min", "reps": 3, "repMin": 10, "recSec": 120, "target": "thresholdAm", "paceBand": ["25k", "30k"], "source": [3] },
+
+    { "id": "PM1", "slot": "pm", "name": "20–25 × 400 m", "reps": [20, 25], "repM": 400, "recSec": 30, "target": "thresholdPm", "paceBand": ["15k", "hm"], "source": [2, 3] },
+    { "id": "PM2", "slot": "pm", "name": "10–12 × 1000 m", "reps": [10, 12], "repM": 1000, "recSec": 60, "target": "thresholdPm", "paceBand": ["15k", "hm"], "source": [2] },
+    { "id": "PM3", "slot": "pm", "name": "10–15 × 1 min / 30 s", "reps": [10, 15], "repMin": 1, "recSec": 30, "target": "thresholdPm", "paceBand": ["15k", "15k"], "source": [1] },
+    { "id": "PM4", "slot": "pm", "name": "15–20 × 45 s / 15 s", "reps": [15, 20], "repSec": 45, "recSec": 15, "target": "thresholdPm", "paceBand": ["15k", "15k"], "source": [1] },
+
+    { "id": "X1", "slot": "x", "name": "Short hills 10–20 × 180–200 m", "reps": [10, 20], "repM": [180, 200], "rec": "jog down", "target": "x", "paceBand": null, "source": [1, 2] },
+    { "id": "X2", "slot": "x", "name": "Long hills 6–8 × 600–800 m", "reps": [6, 8], "repM": [600, 800], "rec": "jog down", "target": "x", "paceBand": null, "source": [2] },
+    { "id": "X3", "slot": "x", "name": "10 × 200 m fast", "reps": 10, "repM": 200, "rec": "200 m jog", "target": "x", "paceBand": ["1500", "mile"], "note": "Bakken: 26–28 s", "source": [2] },
+    { "id": "X4", "slot": "x", "name": "300–1000 m reps at 5–8 mmol", "reps": [5, 10], "repM": [300, 1000], "recSec": [60, 120], "target": "x", "paceBand": ["3k", "5k"], "source": [1] },
+
+    { "id": "R1", "slot": "race", "name": "4–6 × 1000 m + 3–7 × 300 m", "when": "4 days before race", "paceBand": ["3k", "3k"], "note": "watch lactate curve; flat = good shape", "source": [2] },
+    { "id": "R2", "slot": "race", "name": "Standard threshold run", "when": "2 days before race", "target": "threshold", "source": [2] },
+    { "id": "R3", "slot": "race", "name": "300–400 m reps", "when": "early season (Apr–May)", "lactate": "6-8", "source": [2] },
+    { "id": "R4", "slot": "race", "name": "200–1000 m mixed", "when": "later season", "lactate": "7-10", "source": [2] },
+    { "id": "R5", "slot": "race", "name": "2–3 × 2000 m threshold in race warm-up", "when": "race day", "target": "threshold", "source": [2] },
+    { "id": "R6", "slot": "race", "name": "Short threshold near 2.0 mmol", "when": "after race / next morning", "lactate": "~2.0", "source": [2] }
+  ],
+  "weeks": {
+    "base2004": ["easy+easy", "AM1/PM1", "easy+easy", "AM2/PM2", "easy+easy", "X3+easy", "longrun<=18km"],
+    "raceWeekSat": ["easy", "R1", "easy", "R2", "easy+strides", "race", "easy|R6"]
+  },
+  "sources": {
+    "1": "https://www.mariusbakken.com/the-norwegian-model.html",
+    "2": "https://www.mariusbakken.com/norwegian-model-revisited.html",
+    "3": "https://www.mariusbakken.com/double-threshold-training.html"
+  }
+}

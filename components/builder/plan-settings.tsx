@@ -88,13 +88,20 @@ export function PlanSettings() {
             </Select>
           </Field>
         </div>
-        <label htmlFor="deloads" className="flex min-h-12 items-center gap-4">
-          <Switch id="deloads" checked={s.deloads} onCheckedChange={(v) => update({ deloads: v })} />
-          <span>Lighter week at the end of each 4-week block</span>
-        </label>
+        {s.runMethod === "bakken" ? (
+          <label htmlFor="deloads" className="flex min-h-12 items-center gap-4">
+            <Switch id="deloads" checked={s.bakkenDeloads} onCheckedChange={(v) => update({ bakkenDeloads: v })} />
+            <span>Lighter week at the end of each 4-week block (off: flat weeks, as Bakken trained)</span>
+          </label>
+        ) : (
+          <label htmlFor="deloads" className="flex min-h-12 items-center gap-4">
+            <Switch id="deloads" checked={s.deloads} onCheckedChange={(v) => update({ deloads: v })} />
+            <span>Lighter week at the end of each 4-week block</span>
+          </label>
+        )}
         {plan && (
           <p className="max-w-[65ch] font-extralight text-muted-foreground">
-            {s.runMethod === "bakken" && `Below ${s.lowMileage} ${unitDist(u)} a week, only the first double threshold day stays double; the other becomes a single session. Lighter and taper weeks also drop one afternoon session. `}Volume rises at most 5% a week over the last full week; lighter weeks drop to 80%, the week before a race to 85% and race weeks to 65%. The first week back from a vacation holds instead of rising.
+            {s.runMethod === "bakken" && `Below ${s.lowMileage} ${unitDist(u)} a week, only the first double threshold day stays double; the other becomes a single session. Lighter and taper weeks also drop one afternoon session. The long run stays at or under ${u === "mi" ? "11 mi" : "18 km"}. Race weeks get 1000s + 300s four days out and a short threshold run two days out. `}{`${s.runMethod === "bakken" ? "Threshold" : "Sub-T"} work stays within the share: sessions get fewer reps first, and if that's not enough ${s.runMethod === "bakken" ? "a double day becomes a single, then " : ""}a session becomes an easy run. `}Volume rises at most 5% a week over the last full week; lighter weeks drop to 80%, the week before a race to 85% and race weeks to 65%. The first week back from a vacation holds instead of rising.
           </p>
         )}
       </CollapsibleContent>
