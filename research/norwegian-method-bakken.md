@@ -135,7 +135,7 @@ Code: `lib/plan.ts:300-366` (`bakkenSessions`), `lib/settings.ts:92` (default te
 **Matches:**
 - Default week `easy, double, easy, double, easy, x, longrun` (`lib/settings.ts:92`) = W1.
 - AM slower than PM: AM HM–30k pace, PM 15k–HM, never faster than threshold (`lib/plan.ts:318-319`). Fits I3–I5.
-- Threshold share 25% (`lib/settings.ts:84`) ≈ W7. 15–40 min of reps per session (`plan.ts:322`) fits the 2004 sessions.
+- Threshold share 25% (`lib/settings.ts:84`) ≈ W7. 15–40 min of reps per session (`plan.ts:318`) fits the 2004 sessions.
 - AM 6/8/10 min reps, 60 s jog. PM 1 km/60 s and 400 m/30 s (`plan.ts:302-308`). Hills X with jog-down (`plan.ts:343-348`).
 - Fewer doubles below a mileage threshold or in deload and taper weeks (`plan.ts:171`), in the spirit of P4.
 
