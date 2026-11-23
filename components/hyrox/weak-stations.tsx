@@ -44,7 +44,7 @@ export function WeakStations() {
       <CollapsibleContent className="flex flex-col gap-4 border-t p-4 md:p-6">
       <div className="flex flex-col gap-1">
         <p className="max-w-[65ch] font-extralight text-muted-foreground">
-          Each one you pick gets more sets in its regular work, one extra station block a week matched to the phase (strength, then capacity, then race-specific), and gym work for the muscles it relies on, added to a strength day.
+          Each one you pick gets more sets and rounds (+25% or +50%) in the sessions that already train it, a top-up block only in weeks that don't, and gym work for the muscles it relies on.
         </p>
       </div>
       {multi && (

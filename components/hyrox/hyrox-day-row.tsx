@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useApp } from "@/components/app-provider";
 import { dist, fmtShortDate } from "@/lib/format";
 import { dayKm } from "@/lib/plan";
-import { hxDayDate, hxDayText, type HxDayType, type HxWeek } from "@/lib/hyrox";
+import { hxDayDate, hxDayText, STATION, type HxDayType, type HxWeek } from "@/lib/hyrox";
 import { DAYS } from "@/lib/settings";
 import { copyText } from "@/lib/workout-text";
 import { cn } from "@/lib/utils";
@@ -60,7 +60,7 @@ export function HyroxDayRow({ wk, i, onIcu, busy, hideRun = false }: { wk: HxWee
               <p key={k} className="font-extralight text-muted-foreground">Warm-up · {b.text}</p>
             ))}
             <ol className="flex flex-col divide-y divide-border overflow-hidden rounded-md border bg-card">
-              {d.blocks.filter((b) => b.label !== "Warm-up").map((b, k) => <BlockView key={k} b={b} />)}
+              {d.blocks.filter((b) => b.label !== "Warm-up").map((b, k) => <BlockView key={k} b={b} pct={settings.hyrox.emphasis === "high" ? 50 : 25} />)}
             </ol>
             <p className="num text-muted-foreground">{d.type === "race" ? "Race day" : `~${Math.round(d.min)} min`}</p>
             {runLine && <p className="text-meta uppercase text-muted-foreground">Run plan <span className="font-extralight normal-case tracking-normal text-foreground">{runLine}</span></p>}
@@ -81,8 +81,9 @@ export function HyroxDayRow({ wk, i, onIcu, busy, hideRun = false }: { wk: HxWee
 const keepUnits = (s: string) => s.replace(/(\d)\s(?=(s|m|kg|lb|min|km|cal|reps|%)\b)/g, "$1\u00a0").replace(/×\s/g, "×\u00a0");
 
 /** One block: letter badge (A, B, C) or a tag (Weak, Accessory, Main), the work as a heading
- *  and a list of steps, then the coach's cues in small type. */
-function BlockView({ b }: { b: HxBlock }) {
+ *  and a list of steps, then the coach's cues in small type. A block scaled up for weak
+ *  stations keeps its badge and gets a "Weak · Lunges +25%" line. */
+function BlockView({ b, pct }: { b: HxBlock; pct: number }) {
   const p = prettyBlock(keepUnits(b.text));
   const letter = /^[A-Z]$/.test(b.label);
   const station = b.label.split("· ")[1];
@@ -95,6 +96,7 @@ function BlockView({ b }: { b: HxBlock }) {
       </span>
       <div className="flex min-w-0 flex-col gap-1">
         {tag && <p className={cn("text-meta uppercase", b.weak ? "text-signal" : "text-muted-foreground")}>{tag}</p>}
+        {!b.weak && b.boost?.length ? <p className="text-meta uppercase text-signal">Weak · {b.boost.map((st) => STATION[st].short).join(" · ")} +{pct}%</p> : null}
         {p.lines.map((l, i) => (
           <div key={i} className="flex flex-col gap-0.5">
             {l.head && <p className="font-black break-words">{l.head}</p>}
