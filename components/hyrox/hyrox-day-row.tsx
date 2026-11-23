@@ -112,7 +112,7 @@ function BlockView({ b, pct }: { b: HxBlock; pct: number }) {
   const p = prettyBlock(keepUnits(b.text));
   const w = sameShape(p, b.was ? prettyBlock(keepUnits(b.was)) : null);
   const changes = b.was ? numChanges(b.was, b.text) : null;
-  const one = changes?.length === 1 ? ` · ${changes[0][0]} → ${changes[0][1]} sets` : "";
+  const one = changes?.length === 1 ? ` · ${changes[0][0]} → ${changes[0][1]}` : "";
   const letter = /^[A-Z]$/.test(b.label);
   const station = b.label.split("· ")[1];
   const tag = b.weak ? `Weak station · ${station}` : b.acc ? `Accessory · ${station}` : letter || b.label === "Main" ? null : b.label;
