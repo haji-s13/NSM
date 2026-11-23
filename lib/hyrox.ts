@@ -96,7 +96,8 @@ export const WEAK_FACTOR = { moderate: 1.25, high: 1.5 } as const;
 
 /* ---------- Plan shapes ---------- */
 
-export interface HxBlock { label: string; text: string; min: number; weak?: Station; acc?: Station }
+/** `weak`: a top-up block for a weak station. `acc`: accessory gym work. `boost`: weak stations whose sets or rounds this block scaled up. */
+export interface HxBlock { label: string; text: string; min: number; weak?: Station; acc?: Station; boost?: Station[] }
 export interface HxDay {
   type: HxDayType;
   title: string;
@@ -124,6 +125,8 @@ export interface HxWeek {
   raceNames: string[];
   /** The weak stations this week's period targets. */
   weak: Station[];
+  /** Extra volume on weak stations, in percent (25 or 50). */
+  weakPct?: number;
 }
 export interface HxPlan { weeks: HxWeek[]; vol: Partial<Record<Station, number>>; totalMin: number; blocks: CalBlock[] }
 
@@ -160,13 +163,33 @@ const KG_PER_LB = 0.45359237;
 
 class Ctx {
   vol: Partial<Record<Station, number>> = {};
+  /** Weak stations scaled up in the day being built. */
+  boosted = new Set<Station>();
   constructor(public h: HyroxSettings, public spec: WeekSpec, public weak: Station[] = h.weaknesses, public lib: LibSession[] = BUILTIN_SESSIONS) {}
   get div() { return DIVISIONS[this.h.division]; }
   isWeak(st?: Station) { return !!st && this.weak.includes(st); }
-  /** Rounds or sets scaled by the week's volume and, for weak stations, the weakness factor. */
+  /** Benchmark weeks stay as written: no weakness scaling. */
+  get scalesWeak() { return this.spec.kind !== "bench" && this.spec.kind !== "test"; }
+  /** Rounds or sets scaled by the week's volume and, for weak stations, the weakness factor. Tags the station only if the count grew. */
   n(base: number, st?: Station, min = 1) {
-    const f = this.spec.vol * (this.isWeak(st) ? WEAK_FACTOR[this.h.emphasis] : 1);
-    return Math.max(min, Math.round(base * f));
+    const out = Math.max(min, Math.round(base * this.spec.vol * this.weakF(st)));
+    if (st && out !== this.plainN(base, min)) this.boosted.add(st);
+    return out;
+  }
+  /** The same count without the weakness factor. */
+  plainN(base: number, min = 1) { return Math.max(min, Math.round(base * this.spec.vol)); }
+  /** After a caller caps or shifts a scaled count: untag the station if the result matches the unboosted one. */
+  settle(st: Station, value: number, plain: number) {
+    if (value === plain) this.boosted.delete(st);
+    return value;
+  }
+  /** The weakness factor alone (1 for a station that isn't weak, or in a benchmark week). */
+  weakF(st?: Station) { return this.isWeak(st) && this.scalesWeak ? WEAK_FACTOR[this.h.emphasis] : 1; }
+  /** A fixed count scaled only by weakness (the week's volume doesn't change it). */
+  weakN(base: number, st: Station) {
+    const out = Math.round(base * this.weakF(st));
+    if (out !== base) this.boosted.add(st);
+    return out;
   }
   add(st: Station, amount: number) { this.vol[st] = (this.vol[st] || 0) + amount; }
   /** A weight in the chosen unit; pounds round to 5. */
@@ -250,7 +273,7 @@ function weakBlock(c: Ctx, st: Station): HxBlock | null {
         return { label, weak: st, min: sets, text: `Heavy ball EMOM ${sets} × ${reps} with ${heavy} to ${d.target}, best possible form` };
       }
       if (intent === "capacity") {
-        const total = Math.round(([150, 175, 200][step] ?? 150) * (c.isWeak("wb") ? WEAK_FACTOR[c.h.emphasis] : 1) / 25) * 25;
+        const total = Math.round(([150, 175, 200][step] ?? 150) * c.weakF("wb") / 25) * 25;
         c.add(st, total);
         return { label, weak: st, min: Math.ceil(total / 10 / 2), text: `10 unbroken WB every 30 s to ${total} @ ${c.w(d.wb)}` };
       }
@@ -341,20 +364,24 @@ function aerobic(c: Ctx): HxBlock[] {
     c.add("ski", 1000); c.add("row", 1000);
     return [{ label: "Main", min: 30, text: "Hybrid z2: 3 × (5 min bike + 5 min ski or row), easy" }];
   }
-  const n = k === "strength" ? 4 : 5;
+  const base = k === "strength" ? 4 : 5;
   switch (c.spec.w % 4) {
-    case 0:
+    case 0: {
+      const n = c.weakN(base, "farmers");
       c.add("farmers", 100 * n);
       return [{ label: "Main", min: n * 6.5, text: `${n} × (5 min bike @ 60% FTP + 100 m farmers carry @ ${c.w(d.farmers)} per hand)` }];
+    }
     case 1:
       c.add("row", 3 * 1100); c.add("ski", 3 * 1000);
       return [{ label: "Main", min: 48, text: `Recovery machines 3 × (5 min bike, 5 min row, 5 min ski) relaxed, with 5 weighted pull-ups after each round, not heavy` }];
-    case 2:
-      c.add("farmers", 400); c.add("wb", 40); c.add("lunges", 50);
+    case 2: {
+      const n = c.weakN(4, "farmers");
+      c.add("farmers", 100 * n); c.add("wb", 40); c.add("lunges", 50);
       return [
-        { label: "A", min: 26, text: `4 × (5 min bike @ 60% FTP + 100 m farmers carry @ ${c.w(d.farmers)})` },
+        { label: "A", min: n * 6.5, text: `${n} × (5 min bike @ 60% FTP + 100 m farmers carry @ ${c.w(d.farmers)})` },
         { label: "B", min: 10, text: `EMOM 10, alternating 8 heavy WB (${c.w(d.wb + (d.wb >= 9 ? 3 : 2))}) and 10 walking lunges @ ${c.w(d.lunges)}` },
       ];
+    }
     default:
       c.add("ski", 2 * 1000); c.add("row", 2 * 1100);
       return [{ label: "Main", min: 40, text: `Bike fartlek 20 min (4 × 4 min easy @ 50% FTP + 1 min hard), then 2 × (5 min ski + 5 min row) easy` }];
@@ -386,14 +413,16 @@ function lower(c: Ctx): HxBlock[] {
       { label: "B", min: 30, text: `3 rounds: ${c.leg(800, "easy to moderate")} + 50 m sled push @ race effort + ${c.leg(800, "moderate")} + 50 WB @ race effort` },
     ];
   }
-  const lunge = c.n(3, "lunges"), wbSets = c.n(k === "strength" ? 3 : 4, "wb");
+  const wbBase = k === "strength" ? 3 : 4;
+  const lunge = c.n(3, "lunges"), wbSets = c.n(wbBase, "wb");
+  const lunge0 = c.plainN(3), wb0 = c.plainN(wbBase); // the same counts without the weakness factor
   const A: HxBlock = { label: "A", min: 18, text: lift(c, "squat") };
   let B: HxBlock, C: HxBlock;
   if (k === "peak") {
     if (t === 0) { c.add("lunges", 25 * lunge); B = { label: "B", min: 12, text: `Walking lunges ${lunge} × 25 m @ ${c.w(d.lunges)}, rest 1:1. Prioritise speed: quick turnover, stay tall, keep driving forward.` }; }
-    else { const s = Math.min(4, lunge); c.add("lunges", 50 * s); B = { label: "B", min: 14, text: `Lunges for speed: ${s} × 50 m @ ${c.w(d.lunges - 10)} (race weight minus 10 kg), 2 min rest` }; }
+    else { const s = c.settle("lunges", Math.min(4, lunge), Math.min(4, lunge0)); c.add("lunges", 50 * s); B = { label: "B", min: 14, text: `Lunges for speed: ${s} × 50 m @ ${c.w(d.lunges - 10)} (race weight minus 10 kg), 2 min rest` }; }
     if (t === 0) { c.add("wb", wbSets * 30); C = { label: "C", min: wbSets * 2, text: `Wall balls ${wbSets} × 30 unbroken @ ${c.w(d.wb)}, 60 s rest. Find a machine pace that lets you avoid breaks.` }; }
-    else { const r = Math.max(3, wbSets - 1); c.add("wb", 35 * r); c.add("ski", 400 * r); C = { label: "C", min: r * 4, text: `${r} × (400 m ski @ 2k pace + 35 unbroken WB @ ${c.w(d.wb)}), 90 s rest` }; }
+    else { const r = c.settle("wb", Math.max(3, wbSets - 1), Math.max(3, wb0 - 1)); c.add("wb", 35 * r); c.add("ski", 400 * r); C = { label: "C", min: r * 4, text: `${r} × (400 m ski @ 2k pace + 35 unbroken WB @ ${c.w(d.wb)}), 90 s rest` }; }
     return [A, B, C];
   }
   switch (c.spec.w % 3) {
@@ -403,10 +432,10 @@ function lower(c: Ctx): HxBlock[] {
   }
   switch ((c.spec.w + 1) % 3) {
     case 0: c.add("wb", wbSets * 20); C = { label: "C", min: wbSets * 1.5, text: `Wall balls ${wbSets} × 20 unbroken @ ${c.w(d.wb)}, 45 s rest` }; break;
-    case 1: { const top = 10 * Math.min(3, wbSets); const ladder = [] as number[]; for (let r = 10; r <= top; r += 10) ladder.push(r); for (let r = top - 10; r >= 10; r -= 10) ladder.push(r);
+    case 1: { const top = 10 * c.settle("wb", Math.min(3, wbSets), Math.min(3, wb0)); const ladder = [] as number[]; for (let r = 10; r <= top; r += 10) ladder.push(r); for (let r = top - 10; r >= 10; r -= 10) ladder.push(r);
       const total = ladder.reduce((a, b) => a + b, 0); c.add("wb", total); c.add("row", 250 * (ladder.length - 1));
       C = { label: "C", min: Math.round(total / 12 + ladder.length * 1.5), text: `WB ladder ${ladder.join("-")} @ ${c.w(d.wb)}, 250 m row between sets` }; break; }
-    default: { const r = Math.max(2, wbSets - 1); c.add("wb", 30 * r); c.add("row", 500 * r);
+    default: { const r = c.settle("wb", Math.max(2, wbSets - 1), Math.max(2, wb0 - 1)); c.add("wb", 30 * r); c.add("row", 500 * r);
       C = { label: "C", min: r * 4, text: `${r} × (500 m row @ 2k pace + 30 unbroken WB @ ${c.w(d.wb)}), 2 min rest` }; }
   }
   return [A, B, C];
@@ -463,8 +492,9 @@ function upper(c: Ctx): HxBlock[] {
       C = { label: "C", min: pull * 2 + carry * 1.5, text: `Sled pull ${pull} × 12.5 m @ ${c.w(d.pull + 10)}; farmers carry ${carry} × 50 m @ ${c.w(d.farmers)}` }; break;
     case 1: c.add("pull", 12.5 * pull); c.add("farmers", 30 * carry);
       C = { label: "C", min: pull * 2 + carry * 1.5, text: `Sled pull E2MOM ${pull} × 12.5 m from ${c.w(d.pull)}, adding ${c.inc(5)} a round; heavy farmers ${carry} × 30 m @ ${c.w(d.farmers + 8)}` }; break;
-    default: { const lp = Math.max(2, pull - 1); c.add("pull", 25 * lp); c.add("farmers", 100 * Math.max(2, carry - 1));
-      C = { label: "C", min: lp * 3 + 4, text: `Sled pull ${lp} × 25 m @ ${c.w(d.pull)} (big strong pulls, arms and hip drive only); farmers ${Math.max(2, carry - 1)} × 100 m unbroken @ ${c.w(d.farmers)}` }; }
+    default: { const lp = c.settle("pull", Math.max(2, pull - 1), Math.max(2, c.plainN(4) - 1)), lc = c.settle("farmers", Math.max(2, carry - 1), Math.max(2, c.plainN(3) - 1));
+      c.add("pull", 25 * lp); c.add("farmers", 100 * lc);
+      C = { label: "C", min: lp * 3 + 4, text: `Sled pull ${lp} × 25 m @ ${c.w(d.pull)} (big strong pulls, arms and hip drive only); farmers ${lc} × 100 m unbroken @ ${c.w(d.farmers)}` }; }
   }
   return [A, B, C];
 }
@@ -621,7 +651,7 @@ function libPhase(kind: HxKind): LibPhase | null {
 }
 
 /** Fill the athlete-specific placeholders in a library session. */
-function fillTemplate(c: Ctx, t: string): string {
+function fillTemplate(c: Ctx, t: string, st?: Station): string {
   const d = c.div;
   return t.replace(/\{(\w+)(?::([^}]*))?\}/g, (all, key: string, arg = "") => {
     if (key === "w") {
@@ -633,11 +663,32 @@ function fillTemplate(c: Ctx, t: string): string {
       return c.w(kg);
     }
     if (key === "leg") { const [m, effort] = arg.split(":"); return c.leg(Number(m) || 400, effort || "threshold"); }
-    if (key === "n") return String(c.n(Number(arg) || 1));
+    if (key === "n") return String(c.n(Number(arg) || 1, st));
     if (key === "inc") return c.inc(Number(arg) || 5);
     if (key === "target") return d.target;
     return all;
   });
+}
+
+const N_TOKEN = /\{n:[^}]*\}/;
+
+/** How a block's text names each station, to tag the blocks a weakness scaled up. */
+const STATION_RX: Record<Station, RegExp> = {
+  wb: /\bWB\b|wall ball/i,
+  lunges: /lunge/i,
+  push: /sled push|\d+\s*m (sled )?push/i,
+  pull: /sled pull|\bpull\b(?!-ups)/i,
+  farmers: /farmers/i,
+  ski: /\bski\b|SkiErg/i,
+  row: /(?<!bent-over |cable |inverted )\brow\b/i,
+  bbj: /\bBBJ\b|burpee/i,
+};
+
+/** Tag a regular block with the boosted stations its text mentions. */
+function markBoost(b: HxBlock, boosted: Iterable<Station>) {
+  if (b.label === "Warm-up" || b.acc || b.weak) return;
+  const hit = [...boosted].filter((st) => STATION_RX[st].test(b.text));
+  if (hit.length) b.boost = hit; else delete b.boost;
 }
 
 function fromLibrary(c: Ctx, kind: LibKind): { id: string; name: string; blocks: HxBlock[] } | null {
@@ -649,9 +700,28 @@ function fromLibrary(c: Ctx, kind: LibKind): { id: string; name: string; blocks:
   if (!list.length && phase === "sharpen") list = match("peak");
   if (!list.length) return null;
   const s = list[c.spec.w % list.length];
-  for (const [st, v] of Object.entries(s.vol || {}) as [Station, number][]) c.add(st, v * c.spec.vol);
+  const vol = Object.entries(s.vol || {}) as [Station, number][];
+  // Decided block by block: a block that names a weak station gets more rounds ({n:x} scales with the
+  // weakness), more minutes, and the tag. A block with no {n:x}, or whose count doesn't change, stays as written.
   const per = s.minutes / Math.max(1, s.blocks.length);
-  return { id: s.id, name: s.name, blocks: s.blocks.map((b) => ({ label: b.label, text: fillTemplate(c, b.text), min: per })) };
+  const f = WEAK_FACTOR[c.h.emphasis];
+  const scaled: string[] = []; // raw text of the blocks that grew
+  const blocks = s.blocks.map((b) => {
+    const weakHere = N_TOKEN.test(b.text) && c.scalesWeak ? c.weak.filter((st) => STATION_RX[st].test(b.text)) : [];
+    const plain = fillTemplate(c, b.text);
+    const text = weakHere.length ? fillTemplate(c, b.text, weakHere[0]) : plain;
+    const out: HxBlock = { label: b.label, text, min: per };
+    if (text !== plain) {
+      out.min = per * f;
+      out.boost = weakHere;
+      for (const st of weakHere) c.boosted.add(st);
+      scaled.push(b.text);
+    }
+    return out;
+  });
+  // The volume follows: a station grows only if a scaled block trains it.
+  for (const [st, v] of vol) c.add(st, v * c.spec.vol * (scaled.some((t) => STATION_RX[st].test(t)) ? f : 1));
+  return { id: s.id, name: s.name, blocks };
 }
 
 /** Used only if the library has no short quality session for this phase. */
@@ -707,17 +777,25 @@ export function buildHyrox(h: HyroxSettings, cal: Calendar, lib: LibSession[] = 
       const blocked = cw.off.map((off, i) => off || (i === 0 && cw.afterRace));
       const run = runDays?.[cw.i];
       const tmpl = run ? moveOffDoubles(h.template, run.map((r) => r === "double"), blocked, run.map((r) => r !== "easy")) : h.template;
+      const weekBoosted = new Set<Station>(); // weak stations some session this week scaled up
       days = tmpl.map((slot0, i) => {
         const slot: HxSlot = cw.off[i] ? "off" : slot0;
         const before = { ...c.vol };
+        c.boosted.clear();
         const day = dayFor(c, slot);
         day.vol = diff(c.vol, before);
+        // Library days tag their own blocks (only the ones with scaled rounds).
+        if (!day.libId && c.boosted.size) for (const b of day.blocks) markBoost(b, c.boosted);
+        for (const st of c.boosted) weekBoosted.add(st);
         return day;
       });
-      // Extra work for weak stations (not in benchmark weeks).
+      // A top-up block (at most one) for each weak station no session this week scaled up.
+      // Absorb weeks get the light version. Not in benchmark weeks.
       if (spec.kind !== "bench" && spec.kind !== "test") {
-        for (const st of weak) {
-          const host = HOST[st].map((s) => days.findIndex((d) => d.type === s)).find((i) => i >= 0);
+        for (const st of new Set(weak)) {
+          if (weekBoosted.has(st)) continue;
+          // Skip Monday after a Sunday race: it becomes a rest day below and would lose the top-up.
+          const host = HOST[st].map((s) => days.findIndex((d, i) => d.type === s && !(i === 0 && cw.afterRace))).find((i) => i >= 0);
           if (host === undefined) continue;
           const before = { ...c.vol };
           const b = weakBlock(c, st);
@@ -752,7 +830,7 @@ export function buildHyrox(h: HyroxSettings, cal: Calendar, lib: LibSession[] = 
     }
     const weekStart = cw.start;
     weeks.push({
-      weak, block: cw.block, pos: cw.pos, raceNames: cw.races.map((r) => r.race.name || "Race"),
+      weak, weakPct: Math.round((WEAK_FACTOR[h.emphasis] - 1) * 100), block: cw.block, pos: cw.pos, raceNames: cw.races.map((r) => r.race.name || "Race"),
       n: cw.i + 1, phase: spec.phase, phaseKey: spec.phaseKey, kind: spec.kind, light: spec.light, step: spec.step,
       days, weekStart,
       totalMin: days.reduce((t, d) => t + (d.type === "race" ? 0 : d.min), 0),
@@ -776,7 +854,17 @@ export const fmtVol = (st: Station, v: number) => `${Math.round(v).toLocaleStrin
 /** Plain text for one day (Copy button, intervals.icu description). */
 export function hxDayText(wk: HxWeek, d: HxDay): string {
   const lines = [`${d.title} – HYROX week ${wk.n} (${wk.phase})`];
-  for (const b of d.blocks) lines.push(b.label === "Warm-up" ? `Warm-up: ${b.text}` : prettyText(b.label, b.text));
+  const pct = wk.weakPct ?? 25;
+  for (const b of d.blocks) {
+    if (b.label === "Warm-up") { lines.push(`Warm-up: ${b.text}`); continue; }
+    const t = prettyText(b.label, b.text);
+    if (!b.boost?.length) { lines.push(t); continue; }
+    const [first, ...rest] = t.split("\n");
+    // "B: …" can have an empty heading (the steps follow), so put the tag after the label, not after the heading.
+    const tag = `[weak station +${pct}%]`;
+    const m = /^([^:]+):\s?(.*)$/.exec(first);
+    lines.push([m ? `${m[1]}: ${tag}${m[2] ? ` ${m[2]}` : ""}` : `${tag} ${first}`, ...rest].join("\n"));
+  }
   if (d.min && d.type !== "race") lines.push(`Est. time: ~${Math.round(d.min)} min`);
   return lines.join("\n");
 }
