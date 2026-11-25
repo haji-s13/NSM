@@ -143,6 +143,7 @@ export function buildPlan(s: Settings, m: Model, cal: Calendar, models?: (Model 
   let peakWeek: number | null = null;
 
   let hold = false; // no increase in the first week back from a vacation
+  const xCount = { n: 0 }; // X sessions so far: every other one is VO2max intervals
   for (const cw of cal.weeks) {
     const w = cw.i;
     const pm = models?.[cw.period] ?? m;
@@ -242,7 +243,7 @@ export function buildPlan(s: Settings, m: Model, cal: Calendar, models?: (Model 
     });
 
     // Bakken: threshold work is the threshold share of the week, split over the sessions (25–40 min of reps each).
-    const bk = bakken ? bakkenSessions(tmpl, targetKm, s, p, w, cw.blockInPeriod, raceWeek || preTaper || finalTest, deload || testWeek || preTaper) : null;
+    const bk = bakken ? bakkenSessions(tmpl, targetKm, s, p, w, cw.blockInPeriod, raceWeek || preTaper || finalTest, deload || testWeek || preTaper, xCount) : null;
 
     const days: Session[] = tmpl.map((type, di): Session => {
       if (bk && di === raceCheck && type === "x") return bk.raceCheck();
@@ -404,7 +405,16 @@ const PM_FORMATS: Fmt[] = [
   { sec: 45, rec: 15, lo: 15, hi: 25 },
 ];
 
-function bakkenSessions(tmpl: DayType[], targetKm: number, s: Settings, p: Paces, w: number, blockInPeriod: number, nearRace: boolean, light: boolean) {
+// VO2max intervals (Jack Daniels' I pace, roughly 3k–5k race pace): 3–5 min reps, recovery about equal to the
+// rep, and no more than the lesser of 10 km or 8% of the week at I pace (Daniels' Running Formula).
+const VO2_FORMATS = [
+  { km: 1, rec: 180, lo: 3, hi: 6 },
+  { km: 0.8, rec: 150, lo: 4, hi: 8 },
+  { km: 1.2, rec: 210, lo: 3, hi: 5 },
+  { sec: 180, rec: 180, lo: 4, hi: 6 },
+] as const;
+
+function bakkenSessions(tmpl: DayType[], targetKm: number, s: Settings, p: Paces, w: number, blockInPeriod: number, nearRace: boolean, light: boolean, xCount: { n: number }) {
   const wu = Math.max(0, Number(s.subtWarmupKm) || 0);
   const cd = Math.max(0, Number(s.subtCooldownKm) || 0);
   // Morning: controlled, half-marathon to 30k pace. Afternoon: 15k to half pace, never faster than threshold.
@@ -432,6 +442,8 @@ function bakkenSessions(tmpl: DayType[], targetKm: number, s: Settings, p: Paces
   const pm = () => thresholdSession(PM_FORMATS[(w + k * 2 + 1) % PM_FORMATS.length], pmPace, "PM threshold");
 
   const x = (): Session => {
+    // Every other X session is VO2max intervals instead.
+    if (xCount.n++ % 2 === 1) return vo2();
     const hp = p.hills;
     // Fewer reps on lighter weeks and at lower volume (full session from about 80 km a week).
     const scale = (light ? 0.7 : 1) * Math.min(1, Math.max(0.5, targetKm / 80));
@@ -457,6 +469,22 @@ function bakkenSessions(tmpl: DayType[], targetKm: number, s: Settings, p: Paces
     const reps = clamp((kind === "300s" ? 10 : 8) * scale, 5, 10);
     return { type: "x", title: `X session · ${km * 1000}s`, sec: 0, wu: wuX, cd: cdX, km: wuX + reps * km + jogKm(reps, rec) + cdX,
       reps: { n: reps, stepKm: km, stepMin: 0, recS: rec, pace: p.fast, recLabel: "Jog" } };
+  };
+
+  const vo2 = (): Session => {
+    const f = VO2_FORMATS[Math.floor(xCount.n / 2) % VO2_FORMATS.length];
+    const ip = p.fast;
+    const capKm = Math.min(10, 0.08 * targetKm) * (light ? 0.7 : 1);
+    const stepKm = "km" in f ? f.km : f.sec / mid(ip);
+    const reps = clamp(capKm / stepKm, f.lo, f.hi);
+    const wuX = 3, cdX = 2;
+    const work = "km" in f ? `${f.km < 1 ? `${f.km * 1000} m` : `${f.km} km`}` : `${f.sec / 60} min`;
+    return { type: "x", title: "X session · VO2max", sec: 0, wu: wuX, cd: cdX,
+      km: wuX + reps * stepKm + jogKm(reps, f.rec) + cdX,
+      mainText: `${reps} × ${work} @ ${rangeOfPace(ip, s)} (VO2max, 3k–5k effort), ${Math.round(f.rec / 60 * 10) / 10} min jog between`,
+      reps: "km" in f
+        ? { n: reps, stepKm: f.km, stepMin: 0, recS: f.rec, pace: ip, recLabel: "Jog" }
+        : { n: reps, stepKm: null, stepMin: f.sec / 60, recS: f.rec, pace: ip, recLabel: "Jog" } };
   };
 
   /** Race week, 4 days out: 1000s then 300s near 3k pace. A check of shape, not a hard session. */
