@@ -56,7 +56,7 @@ export function BuilderScreen() {
         <h1 className="font-display text-[2rem] leading-10 font-black md:text-display">Run Plan</h1>
         <p className="max-w-[65ch] text-muted-foreground">
           {plan.weeks.length} weeks in {calendar.periods.length} period{calendar.periods.length === 1 ? "" : "s"} of 12 weeks, {bakken
-            ? "two double threshold days (a controlled morning session and a slightly faster afternoon one) and an X session of short, fast reps, one long run."
+            ? "two double threshold days (a controlled morning session and a slightly faster afternoon one) and an X session (short, fast reps, alternating with VO2max intervals), one long run."
             : "three sub-threshold sessions, one long run."} Everything else is easy. Set dates, races and time off on Profile.
         </p>
         <SaveStatus />
